@@ -97,11 +97,14 @@ class TestRateLimitIntegration:
         
         responses = []
         # Auth limit is 10/minute
-        for _ in range(15):
-            r = await client.post("/auth/token", json=auth_payload)
-            responses.append(r)
-            if r.status_code == 429:
-                break
+        from unittest.mock import patch, AsyncMock
+        with patch("app.api.auth.get_client_by_id", new_callable=AsyncMock) as mock_get_client:
+            mock_get_client.return_value = None # We just want it to return something safe
+            for _ in range(15):
+                r = await client.post("/auth/token", json=auth_payload)
+                responses.append(r)
+                if r.status_code == 429:
+                    break
         
         status_codes = [r.status_code for r in responses]
         assert 429 in status_codes, "Auth endpoint should trigger 429 after ~10 attempts"

@@ -131,12 +131,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.add_middleware(SecureHeadersMiddleware)
 
-    # [Fix #5] Create a limiter that reads the IP-level rate limit from settings,
-    # so changing RATE_LIMIT_PER_IP in .env is actually honoured at runtime.
-    # The module-level `limiter` singleton is kept for @limiter.limit() decorators
-    # on auth/proxy routes that are evaluated at import-time.
-    app_limiter = create_limiter(default_limit=settings.rate_limit_per_ip)
-    app.state.limiter = app_limiter
+    # [Fix #5] Use the global limiter singleton but ensure it uses the
+    # default limit from settings for this application instance.
+    limiter.default_limits = [settings.rate_limit_per_ip]
+    app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _on_rate_limit_exceeded)
 
     # ── Routers ───────────────────────────────────────────────────────────────
