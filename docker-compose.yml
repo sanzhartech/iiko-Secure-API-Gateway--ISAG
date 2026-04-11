@@ -10,22 +10,40 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # Explicitly route SQLite to the persistent volume mount point
       - DATABASE_URL=sqlite+aiosqlite:////app/data/gateway.db
       - APP_ENV=production
     volumes:
-      # Ephemeral or persistent sqlite database data store
       - gateway_data:/app/data
-      # Mount external keys as read-only (Zero-Trust)
       - ./backend/keys:/app/keys:ro
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: iiko-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --save ""
+      --appendonly no
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # Не expose порт наружу — только внутренняя сеть
 
 volumes:
   gateway_data:
