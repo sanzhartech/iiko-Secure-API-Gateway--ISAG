@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short --cov=app --cov-report=term-missing"
+
+[tool.coverage.run]
+omit = ["tests/*", "app/main.py"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+select = ["E", "F", "I", "S", "UP"]
+ignore = ["S101"]   # allow assert in tests
