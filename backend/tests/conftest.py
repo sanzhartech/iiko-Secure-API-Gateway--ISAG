@@ -116,7 +116,7 @@ def make_token(rsa_private_key_pem):
         payload: dict[str, Any] = {
             "type": token_type,
             "sub": sub,
-            "roles": roles or ["operator"],
+            "roles": roles if roles is not None else ["operator"],
             "iss": iss,
             "aud": aud,
             "exp": now + exp_offset,
@@ -140,7 +140,7 @@ def make_token(rsa_private_key_pem):
 # ── Mock Settings ─────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="session")
-def test_settings(rsa_private_key_pem, rsa_public_key_pem, rsa_rotated_public_key_pem):
+def test_settings(tmp_path_factory, rsa_private_key_pem, rsa_public_key_pem, rsa_rotated_public_key_pem):
     """
     MagicMock of Settings pre-loaded with in-memory RSA keys.
 
@@ -152,13 +152,30 @@ def test_settings(rsa_private_key_pem, rsa_public_key_pem, rsa_rotated_public_ke
     """
     # Set required env vars so Pydantic Settings validates
     import os
+    import json
+    
+    tmp_dir = tmp_path_factory.mktemp("keys")
+    private_key_path = tmp_dir / "private.pem"
+    private_key_path.write_text(rsa_private_key_pem, encoding="utf-8")
+    
+    public_keys_path = tmp_dir / "public_keys.json"
+    public_keys_data = {
+        "primary-1": rsa_public_key_pem,
+        "rotated-2": rsa_rotated_public_key_pem
+    }
+    public_keys_path.write_text(json.dumps(public_keys_data), encoding="utf-8")
+    
     os.environ["IIKO_API_BASE_URL"] = "https://fake-iiko.example.com"
     os.environ["IIKO_API_KEY"] = "test-iiko-key-upstream-only"
     os.environ["GATEWAY_CLIENT_SECRET"] = "test-gateway-client-secret-separate"
-    os.environ["PYTHON_PATH"] = "" # Override `.env` invalid extra
+    os.environ["JWT_PRIVATE_KEY_PATH"] = str(private_key_path)
+    os.environ["JWT_PUBLIC_KEYS_PATH"] = str(public_keys_path)
+    os.environ["JWT_ACTIVE_KID"] = "primary-1"
+    
+    os.environ.pop("PYTHON_PATH", None)
 
     from app.core.config import Settings
-    s = Settings()
+    s = Settings(_env_file=None)
 
     # JWT — single (active) public key for backward-compat consumers
     object.__setattr__(s, "_jwt_public_key_cache", rsa_public_key_pem)

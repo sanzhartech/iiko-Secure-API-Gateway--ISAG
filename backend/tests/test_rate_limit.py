@@ -67,15 +67,14 @@ class TestRateLimitIntegration:
         limit_count = 50
         responses = []
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            for _ in range(limit_count + 5):
-                r = await client.get(
-                    "/api/ping",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                responses.append(r)
-                if r.status_code == 429:
-                    break
+        for _ in range(limit_count + 5):
+            r = await client.get(
+                "/api/ping",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            responses.append(r)
+            if r.status_code == 429:
+                break
 
         status_codes = [r.status_code for r in responses]
         assert 429 in status_codes, (
@@ -94,7 +93,7 @@ class TestRateLimitIntegration:
         Stricter limit (10/minute) must be enforced.
         """
         client, _ = async_client
-        auth_payload = {"client_id": "demo-client", "client_secret": "wrong"}
+        auth_payload = {"client_id": "demo-client", "client_secret": "wrong_secret"}
         
         responses = []
         # Auth limit is 10/minute

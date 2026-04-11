@@ -70,13 +70,17 @@ class TestRBACHTTP:
         """operator role has PROXY_READ → GET /api/... allowed."""
         client, mock_iiko = async_client
         token = make_token(roles=["operator"])
-        mock_iiko.proxy_request.return_value = httpx.Response(200, json={"data": []})
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            yield httpx.Response(200, json={"data": []})
+        from unittest.mock import MagicMock
+        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code != 403
 
@@ -85,12 +89,11 @@ class TestRBACHTTP:
         client, _ = async_client
         token = make_token(roles=["viewer"])
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.post(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"order": "data"},
-            )
+        response = await client.post(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"order": "data"},
+        )
 
         assert response.status_code == 403
 
@@ -99,11 +102,10 @@ class TestRBACHTTP:
         client, _ = async_client
         token = make_token(roles=[])
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 403
 
@@ -112,11 +114,10 @@ class TestRBACHTTP:
         client, _ = async_client
         token = make_token(roles=["superuser"])  # not in ROLE_PERMISSIONS
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 403
 
@@ -124,13 +125,17 @@ class TestRBACHTTP:
         """admin role has all permissions → GET and POST both allowed."""
         client, mock_iiko = async_client
         token = make_token(roles=["admin"])
-        mock_iiko.proxy_request.return_value = httpx.Response(201, json={"created": True})
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            yield httpx.Response(201, json={"created": True})
+        from unittest.mock import MagicMock
+        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.post(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"order": "data"},
-            )
+        response = await client.post(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"order": "data"},
+        )
 
         assert response.status_code != 403

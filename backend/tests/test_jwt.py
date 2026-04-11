@@ -30,14 +30,17 @@ class TestJWTValidation:
         client, mock_iiko = async_client
         token = make_token(roles=["operator"])
 
-        mock_iiko.proxy_request.return_value = httpx.Response(200, json={"ok": True})
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            yield httpx.Response(200, json={"ok": True})
+        from unittest.mock import MagicMock
+        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
 
-        with patch("app.core.config.get_settings", return_value=test_settings), \
-             patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         # 200 or whatever iiko returns — not 401/403
         assert response.status_code not in (401, 403), (
@@ -49,11 +52,10 @@ class TestJWTValidation:
         client, _ = async_client
         token = make_token(exp_offset=-3600)   # expired 1 hour ago
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401
 
@@ -62,11 +64,10 @@ class TestJWTValidation:
         client, _ = async_client
         token = make_token(algorithm="HS256", signing_key="some-symmetric-secret")
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401
 
@@ -81,11 +82,10 @@ class TestJWTValidation:
         payload = base64.urlsafe_b64encode(json.dumps(payload_data).encode()).rstrip(b"=")
         token = f"{header.decode()}.{payload.decode()}."
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401
 
@@ -94,11 +94,10 @@ class TestJWTValidation:
         client, _ = async_client
         token = make_token(iss="evil-issuer.example.com")
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401
 
@@ -107,11 +106,10 @@ class TestJWTValidation:
         client, _ = async_client
         token = make_token(aud="wrong-audience")
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401
 
@@ -120,11 +118,10 @@ class TestJWTValidation:
         client, _ = async_client
         token = make_token(omit_claims=["sub"])
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401
 
@@ -137,11 +134,10 @@ class TestJWTValidation:
     async def test_malformed_token_rejected(self, async_client, test_settings):
         """Garbage Bearer value → 401."""
         client, _ = async_client
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": "Bearer not.a.valid.jwt.at.all"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": "Bearer not.a.valid.jwt.at.all"},
+        )
 
         assert response.status_code == 401
 
@@ -172,19 +168,22 @@ class TestJWTKeyRotation:
         """
         client, mock_iiko = async_client
         import httpx as _httpx
-        mock_iiko.proxy_request.return_value = _httpx.Response(200, json={"ok": True})
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            yield _httpx.Response(200, json={"ok": True})
+        from unittest.mock import MagicMock
+        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
 
         token = make_token(
             signing_key=rsa_rotated_private_key_pem,
             kid="kid-test-rotated",
         )
 
-        with patch("app.core.config.get_settings", return_value=test_settings), \
-             patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code not in (401, 403), (
             f"Rotated-key token should pass, got {response.status_code}: {response.text}"
@@ -199,11 +198,10 @@ class TestJWTKeyRotation:
         client, _ = async_client
         token = make_token(kid="kid-unknown-attacker")
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401, (
             f"Unknown kid should return 401, got {response.status_code}"
@@ -218,16 +216,19 @@ class TestJWTKeyRotation:
         """
         client, mock_iiko = async_client
         import httpx as _httpx
-        mock_iiko.proxy_request.return_value = _httpx.Response(200, json={"ok": True})
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            yield _httpx.Response(200, json={"ok": True})
+        from unittest.mock import MagicMock
+        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
 
         token = make_token(kid=None)   # no kid in JOSE header
 
-        with patch("app.core.config.get_settings", return_value=test_settings), \
-             patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code not in (401, 403), (
             f"No-kid fallback should pass, got {response.status_code}: {response.text}"
@@ -250,11 +251,10 @@ class TestJWTKeyRotation:
             kid="kid-test-2025",      # claims primary kid but signed with rotated key
         )
 
-        with patch("app.security.jwt_validator.get_settings", return_value=test_settings):
-            response = await client.get(
-                "/api/orders",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+        response = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 401, (
             f"Wrong key for valid kid must return 401, got {response.status_code}"

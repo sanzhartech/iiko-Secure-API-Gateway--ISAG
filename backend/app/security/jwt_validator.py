@@ -162,6 +162,10 @@ class JWTValidator:
             logger.warning("jwt_invalid_type", expected=expected_type, actual=token_type)
             self._reject("Invalid token type")
             
+        if "sub" not in payload:
+            logger.warning("jwt_missing_claim", claim="sub")
+            self._reject("Missing 'sub' claim")
+
         return TokenClaims(
             sub=str(payload["sub"]),
             type=token_type,
