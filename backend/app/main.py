@@ -18,7 +18,10 @@ from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.middleware.rate_limiter import _on_rate_limit_exceeded, create_limiter, limiter
 from app.middleware.secure_headers import SecureHeadersMiddleware
+from app.middleware.size_validator import RequestSizeValidatorMiddleware
+from app.middleware.response_filter import ResponseFilterMiddleware
 from app.security.audit import AuditLogMiddleware
+from app.core.redis import get_redis_service
 from app.services.iiko_client import IikoClient
 
 from app.db.engine import init_db, AsyncSessionLocal
@@ -39,8 +42,13 @@ async def seed_demo_client(settings: Settings) -> None:
                 roles=["operator"]
             )
             session.add(demo_client)
-            await session.commit()
-            logger.info("seeded_demo_client", client_id="demo-client")
+            try:
+                await session.commit()
+                logger.info("seeded_demo_client", client_id="demo-client")
+            except Exception:
+                # Handle race condition where another worker already committed
+                await session.rollback()
+                logger.debug("demo_client_already_seeded")
 
 
 def _make_lifespan(settings: Settings):
@@ -65,11 +73,18 @@ def _make_lifespan(settings: Settings):
         await init_db()
         await seed_demo_client(settings)
 
+        # [Phase 3] Initialize Redis connection pool
+        redis_service = get_redis_service(settings)
+        await redis_service.connect()
+
         yield
 
         logger.info("isag_shutdown")
         if iiko_client is not None:
             await iiko_client.aclose()
+        
+        # [Phase 3] Close Redis connection pool
+        await redis_service.disconnect()
 
     return lifespan
 
@@ -110,16 +125,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={"detail": "Internal server error"},
         )
 
-    # ── Middleware Stack (LIFO — last registered runs first) ─────────────────
+    # ── Middleware Stack (LIFO — last registered runs first for requests) ────
 
-    # [Fix] SlowAPIMiddleware registered correctly for global rate limiting
-    app.add_middleware(SlowAPIMiddleware)
+    # Stage 9: Response Filtering (Innermost)
+    app.add_middleware(ResponseFilterMiddleware)
 
+    # Stage 8: Audit Logging
     app.add_middleware(
         AuditLogMiddleware,
         trusted_cidrs=settings.trusted_proxy_cidrs_list,
     )
 
+    # CORS Stage
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -129,11 +146,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expose_headers=["X-Request-ID"],
     )
 
+    # Stage 3: Rate Limiting
+    app.add_middleware(SlowAPIMiddleware)
+
+    # Stage 2: Request Size Validation
+    app.add_middleware(RequestSizeValidatorMiddleware, max_upload_size=10 * 1024 * 1024)
+
+    # Stage 1: Transport Security & Headers (Outermost)
     app.add_middleware(SecureHeadersMiddleware)
 
     # [Fix #5] Use the global limiter singleton but ensure it uses the
-    # default limit from settings for this application instance.
+    # default limit and Redis storage from settings.
     limiter.default_limits = [settings.rate_limit_per_ip]
+    # Re-initialize storage if Redis is configured
+    if settings.redis_url:
+        from limits.storage import storage_from_string
+        limiter._storage = storage_from_string(settings.redis_url)
+        limiter._strategy = None # Force re-creation of strategy with new storage
+    
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _on_rate_limit_exceeded)
 

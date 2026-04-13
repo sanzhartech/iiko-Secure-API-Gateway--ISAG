@@ -36,3 +36,7 @@ keys/private.pem
 # Temp scripts
 fix_tests.py
 revert_tests.py
+
+backend/keys/
+
+*.docx

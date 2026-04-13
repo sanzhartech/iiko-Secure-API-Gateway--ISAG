@@ -15,6 +15,7 @@ SECURITY:
 """
 
 import hmac
+import uuid
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
@@ -61,7 +62,7 @@ def _issue_access_token(sub: str, roles: list[str], settings: Settings) -> str:
         "roles": roles,
         "exp": int(expire.timestamp()),
         "iat": int(now.timestamp()),
-        "jti": secrets.token_urlsafe(16),
+        "jti": uuid.uuid4().hex,
     }
 
     return jwt.encode(
@@ -88,7 +89,7 @@ def _issue_refresh_token(sub: str, settings: Settings) -> str:
         "sub": sub,
         "exp": int(expire.timestamp()),
         "iat": int(now.timestamp()),
-        "jti": secrets.token_urlsafe(16),
+        "jti": uuid.uuid4().hex,
     }
 
     return jwt.encode(
@@ -177,7 +178,7 @@ async def refresh_token(
     """
     try:
         # Validate specifically expecting a refresh token
-        claims = validator.validate(body.refresh_token, expected_type="refresh")
+        claims = await validator.validate(body.refresh_token, expected_type="refresh")
     except HTTPException:
         # Pass through the 401 Unauthorized from validator
         raise

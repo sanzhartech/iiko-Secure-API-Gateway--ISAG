@@ -4,6 +4,7 @@ size_validator.py — Request Size Validation Stage 2
 """
 
 from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -16,6 +17,9 @@ class RequestSizeValidatorMiddleware(BaseHTTPMiddleware):
         if request.method in ["POST", "PUT", "PATCH"]:
             content_length = request.headers.get("content-length")
             if content_length and int(content_length) > self.max_upload_size:
-                raise HTTPException(status_code=413, detail="Request entity too large")
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request entity too large"}
+                )
         
         return await call_next(request)

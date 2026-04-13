@@ -13,10 +13,19 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/gateway.db
       - APP_ENV=production
     volumes:
+      # Data persistence for SQLite and logs
       - gateway_data:/app/data
+      # [Rule 3] Critical: Mount RSA keys in Read-Only mode
       - ./backend/keys:/app/keys:ro
-    mem_limit: 512m
-    cpus: 0.5
+    # [Rule 12] Stage 2: Protection against Resource Exhaustion
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -38,12 +47,17 @@ services:
       --appendonly no
       --maxmemory 128mb
       --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'
+          memory: 256M
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
-    # Не expose порт наружу — только внутренняя сеть
+    # Security: No ports exposed to host. Only internal container network access.
 
 volumes:
   gateway_data:

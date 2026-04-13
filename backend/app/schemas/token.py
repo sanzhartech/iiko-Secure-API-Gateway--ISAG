@@ -21,6 +21,7 @@ class TokenClaims(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     sub: str = Field(..., description="Subject — unique user identifier")
+    jti: str = Field(..., description="JWT ID — unique token identifier for replay protection")
     type: Literal["access", "refresh"] = Field("access", description="Type of the token")
     roles: list[str] = Field(default_factory=list, description="User roles")
     iss: str = Field(..., description="Issuer")

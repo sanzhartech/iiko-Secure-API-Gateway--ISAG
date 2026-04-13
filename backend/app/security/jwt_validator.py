@@ -35,6 +35,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 from jose.exceptions import JWTClaimsError
+from app.security.jti_store import JTIStore, get_jti_store
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
@@ -61,13 +62,14 @@ class JWTValidator:
         "HS256", "HS384", "HS512", "none",
     })
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, jti_store: JTIStore) -> None:
         # [KID] Full key store: dict[kid → pem].  At minimum one entry.
         self._public_keys: dict[str, str] = settings.jwt_public_keys
         self._algorithm = settings.jwt_algorithm
         self._issuer = settings.jwt_issuer
         self._audience = settings.jwt_audience
         self._clock_skew = settings.jwt_clock_skew_seconds
+        self._jti_store = jti_store
 
     def _decode(self, raw_token: str) -> dict[str, Any]:
         """
@@ -124,7 +126,7 @@ class JWTValidator:
                     "verify_iat": True,
                     "verify_aud": True,
                     "verify_iss": True,
-                    "require": ["sub", "exp", "iat", "iss", "aud"],
+                    "require": ["sub", "exp", "iat", "iss", "aud", "jti"],
                     "leeway": self._clock_skew,
                 },
             )
@@ -137,6 +139,10 @@ class JWTValidator:
         except JWTError as exc:
             logger.warning("jwt_decode_error", detail=str(exc))
             self._reject("Invalid token")
+
+        if "jti" not in payload:
+            logger.warning("jwt_missing_jti")
+            self._reject("Missing jti")
 
         return payload
 
@@ -153,8 +159,11 @@ class JWTValidator:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    def validate(self, raw_token: str, expected_type: str = "access") -> TokenClaims:
-        """Validate token and return typed, parsed claims."""
+    async def validate(self, raw_token: str, expected_type: str = "access") -> TokenClaims:
+        """
+        Validate token and return typed, parsed claims.
+        [Phase 3] Performs asynchronous JTI replay check in Redis.
+        """
         payload = self._decode(raw_token)
         
         token_type = payload.get("type", "access")
@@ -166,8 +175,9 @@ class JWTValidator:
             logger.warning("jwt_missing_claim", claim="sub")
             self._reject("Missing 'sub' claim")
 
-        return TokenClaims(
+        claims = TokenClaims(
             sub=str(payload["sub"]),
+            jti=str(payload["jti"]),
             type=token_type,
             roles=payload.get("roles", []),
             iss=payload["iss"],
@@ -176,14 +186,21 @@ class JWTValidator:
             iat=payload["iat"],
         )
 
+        # —— Step 4: Replay Protection (Stage 5) ——————————————————————
+        if await self._jti_store.is_replay(claims.jti, claims.exp):
+            self._reject("Token has already been used")
+
+        return claims
+
 
 # ── FastAPI dependency factories ──────────────────────────────────────────────
 
 def get_jwt_validator(
     settings: Annotated[Settings, Depends(get_settings)],
+    jti_store: Annotated[JTIStore, Depends(get_jti_store)],
 ) -> JWTValidator:
-    """FastAPI dependency: returns a JWTValidator backed by in-memory key cache."""
-    return JWTValidator(settings)
+    """FastAPI dependency: returns a JWTValidator backed by JTIStore."""
+    return JWTValidator(settings, jti_store)
 
 
 async def get_current_claims(
@@ -207,7 +224,7 @@ async def get_current_claims(
             claims: Annotated[TokenClaims, Depends(get_current_claims)]
         ): ...
     """
-    claims = validator.validate(credentials.credentials)
+    claims = await validator.validate(credentials.credentials)
 
     # [Fix 2] Set verified user_id BEFORE route handler body executes.
     # The rate limiter @limiter.limit() decorator evaluates AFTER dependencies,

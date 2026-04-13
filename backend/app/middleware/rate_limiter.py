@@ -60,24 +60,17 @@ def _get_rate_limit_key(request: Request) -> str:
     return get_remote_address(request)
 
 
-def create_limiter(default_limit: str = "100/minute") -> Limiter:
+def create_limiter(storage_uri: str, default_limit: str = "100/minute") -> Limiter:
     """
     Create and return the configured slowapi Limiter.
 
-    ``default_limit`` should be the value of settings.rate_limit_per_ip
-    so the env-variable is actually honoured (previously hardcoded).
-
-    For multi-process / Kubernetes deployments, configure Redis:
-        storage_uri="redis://redis:6379"
-    In-memory storage is safe for single-process deployments only.
-
-    NOTE: The RateLimitExceeded exception handler (_on_rate_limit_exceeded) is
-    registered on the FastAPI app in main.py via add_exception_handler().
-    slowapi.Limiter does NOT accept an on_breach kwarg.
+    [Phase 3] Uses Redis storage if configured via settings.redis_url.
+    In-memory storage is used if storage_uri starts with 'memory://'.
     """
     return Limiter(
         key_func=_get_rate_limit_key,
         default_limits=[default_limit],
+        storage_uri=storage_uri,
         strategy="fixed-window",
     )
 
@@ -106,4 +99,4 @@ def _on_rate_limit_exceeded(request: Request, exc: RateLimitExceeded) -> JSONRes
 # The default limit is set to 100/minute here as a safe fallback.
 # In main.py the limiter is re-created (via create_limiter) with the value
 # from settings.rate_limit_per_ip so the env-variable is honoured at runtime.
-limiter = create_limiter()
+limiter = create_limiter("memory://")

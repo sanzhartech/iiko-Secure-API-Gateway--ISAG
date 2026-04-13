@@ -13,7 +13,7 @@ os.environ["TESTING"] = "1"
 
 import time
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -112,6 +112,7 @@ def make_token(rsa_private_key_pem):
         omit_claims: list[str] | None = None,
         kid: str | None = _KID_PRIMARY,       # [KID] default kid matches test_settings
     ) -> str:
+        import uuid
         now = int(time.time())
         payload: dict[str, Any] = {
             "type": token_type,
@@ -121,7 +122,7 @@ def make_token(rsa_private_key_pem):
             "aud": aud,
             "exp": now + exp_offset,
             "iat": now + iat_offset,
-            "jti": "test-jti-0001",
+            "jti": uuid.uuid4().hex,
         }
         if extra_claims:
             payload.update(extra_claims)
@@ -216,6 +217,10 @@ def test_settings(tmp_path_factory, rsa_private_key_pem, rsa_public_key_pem, rsa
     s.log_level = "ERROR"
     s.log_format = "console"
 
+    # [Phase 3] Redis — Use memory:// for SlowAPI and dummy for others
+    s.redis_url = "memory://"
+    s.jti_expiry_buffer_seconds = 60
+
     # App
     s.app_env = "development"
     s.app_debug = False
@@ -251,8 +256,37 @@ async def async_client(test_settings):
     mock_iiko = AsyncMock()
     application.state.iiko_client = mock_iiko
 
+    # [Phase 3] Mock Redis for JTI Store
+    mock_redis = AsyncMock()
+    # Mock SET ... NX EX behavior: True means success (new token), None/False means replay
+    mock_redis.set.return_value = True 
+    
+    from app.core.redis import get_redis, get_redis_service
+    
+    # Simple dependency override for Redis client
+    application.dependency_overrides[get_redis] = lambda: mock_redis
+    # Mock RedisService to avoid connection attempts in lifespan
+    mock_redis_service = MagicMock()
+    mock_redis_service.connect = AsyncMock()
+    mock_redis_service.disconnect = AsyncMock()
+    mock_redis_service.client = mock_redis
+    application.dependency_overrides[get_redis_service] = lambda: mock_redis_service
+
     async with AsyncClient(
         transport=ASGITransport(app=application),
         base_url="http://test",
     ) as client:
-        yield client, mock_iiko
+        yield client, mock_iiko, mock_redis
+
+
+@pytest.fixture(autouse=True)
+def reset_mocks(async_client):
+    """
+    Reset shared session-scoped mocks before every test to prevent state leakage.
+    Ensures that mock_redis.set return value and mock_iiko call history are clean.
+    """
+    _, mock_iiko, mock_redis = async_client
+    mock_iiko.reset_mock()
+    mock_redis.reset_mock()
+    # Ensure JTI checks pass by default
+    mock_redis.set.return_value = True

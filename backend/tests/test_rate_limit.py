@@ -50,7 +50,7 @@ class TestRateLimitIntegration:
         """
         import uuid as _uuid
 
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         # [Fix #8] Unique user per test run → isolated in-memory rate bucket
         unique_sub = f"burst-user-{_uuid.uuid4().hex[:8]}"
         token = make_token(sub=unique_sub, roles=["operator"])
@@ -68,6 +68,8 @@ class TestRateLimitIntegration:
         responses = []
 
         for _ in range(limit_count + 5):
+            # Generate a fresh token for each request to avoid JTI replay protection
+            token = make_token(sub=unique_sub, roles=["operator"])
             r = await client.get(
                 "/api/ping",
                 headers={"Authorization": f"Bearer {token}"},
@@ -92,7 +94,7 @@ class TestRateLimitIntegration:
         [Fix] Behavioral audit of /auth/token rate limit.
         Stricter limit (10/minute) must be enforced.
         """
-        client, _ = async_client
+        client, _, _ = async_client
         auth_payload = {"client_id": "demo-client", "client_secret": "wrong_secret"}
         
         responses = []

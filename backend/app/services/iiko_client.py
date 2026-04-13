@@ -53,14 +53,19 @@ _STRIP_RESPONSE_HEADERS: frozenset[str] = frozenset({
 def _sanitize_path(raw_path: str) -> str:
     """Normalise and validate the proxy path before forwarding."""
     decoded = urllib.parse.unquote(raw_path)
-    normalised = posixpath.normpath(f"/{decoded}")
-    segments = normalised.split("/")
-    if ".." in segments:
+
+    # [Security] Check for traversal sequences in the RAW decoded path
+    # BEFORE normpath resolves them. posixpath.normpath('/../etc/passwd')
+    # silently returns '/etc/passwd', hiding the attack intent.
+    raw_segments = decoded.replace("\\", "/").split("/")
+    if ".." in raw_segments:
         logger.warning("proxy_path_traversal_blocked", raw_path=raw_path)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid request path",
         )
+
+    normalised = posixpath.normpath(f"/{decoded}")
     return normalised
 
 

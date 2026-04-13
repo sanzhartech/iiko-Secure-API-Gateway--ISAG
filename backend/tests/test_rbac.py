@@ -68,7 +68,7 @@ class TestRBACHTTP:
 
     async def test_operator_can_get(self, async_client, make_token, test_settings):
         """operator role has PROXY_READ → GET /api/... allowed."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         token = make_token(roles=["operator"])
         from contextlib import asynccontextmanager
         @asynccontextmanager
@@ -86,7 +86,7 @@ class TestRBACHTTP:
 
     async def test_viewer_cannot_post(self, async_client, make_token, test_settings):
         """viewer has only PROXY_READ → POST /api/... denied with 403."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(roles=["viewer"])
 
         response = await client.post(
@@ -99,7 +99,7 @@ class TestRBACHTTP:
 
     async def test_no_roles_denied(self, async_client, make_token, test_settings):
         """Token with empty roles list → 403 on any endpoint."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(roles=[])
 
         response = await client.get(
@@ -111,7 +111,7 @@ class TestRBACHTTP:
 
     async def test_unknown_role_denied(self, async_client, make_token, test_settings):
         """Unknown role → deny by default → 403."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(roles=["superuser"])  # not in ROLE_PERMISSIONS
 
         response = await client.get(
@@ -123,7 +123,7 @@ class TestRBACHTTP:
 
     async def test_admin_can_get_and_post(self, async_client, make_token, test_settings):
         """admin role has all permissions → GET and POST both allowed."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         token = make_token(roles=["admin"])
         from contextlib import asynccontextmanager
         @asynccontextmanager

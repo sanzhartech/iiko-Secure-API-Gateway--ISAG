@@ -27,7 +27,7 @@ class TestJWTValidation:
 
     async def test_valid_token_accepted(self, async_client, make_token, test_settings):
         """Valid RS256 token with correct claims → passes JWT validation."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         token = make_token(roles=["operator"])
 
         from contextlib import asynccontextmanager
@@ -49,7 +49,7 @@ class TestJWTValidation:
 
     async def test_expired_token_rejected(self, async_client, make_token, test_settings):
         """Token where exp is in the past → 401."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(exp_offset=-3600)   # expired 1 hour ago
 
         response = await client.get(
@@ -61,7 +61,7 @@ class TestJWTValidation:
 
     async def test_hs256_algorithm_rejected(self, async_client, make_token, test_settings):
         """HS256-signed token must be rejected (algorithm confusion attack)."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(algorithm="HS256", signing_key="some-symmetric-secret")
 
         response = await client.get(
@@ -73,7 +73,7 @@ class TestJWTValidation:
 
     async def test_alg_none_rejected(self, async_client, test_settings):
         """Unsigned token (alg=none) must be rejected."""
-        client, _ = async_client
+        client, _, _ = async_client
         # Craft a token with alg=none manually (jose won't normally produce it)
         import base64, json
         header = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).rstrip(b"=")
@@ -91,7 +91,7 @@ class TestJWTValidation:
 
     async def test_wrong_issuer_rejected(self, async_client, make_token, test_settings):
         """Token with wrong iss claim → 401."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(iss="evil-issuer.example.com")
 
         response = await client.get(
@@ -103,7 +103,7 @@ class TestJWTValidation:
 
     async def test_wrong_audience_rejected(self, async_client, make_token, test_settings):
         """Token with wrong aud claim → 401."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(aud="wrong-audience")
 
         response = await client.get(
@@ -115,7 +115,7 @@ class TestJWTValidation:
 
     async def test_missing_sub_claim_rejected(self, async_client, make_token, test_settings):
         """Token without 'sub' claim → 401."""
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(omit_claims=["sub"])
 
         response = await client.get(
@@ -127,13 +127,13 @@ class TestJWTValidation:
 
     async def test_no_authorization_header(self, async_client):
         """Missing Authorization header → 401/403."""
-        client, _ = async_client
+        client, _, _ = async_client
         response = await client.get("/api/orders")
         assert response.status_code in (401, 403)
 
     async def test_malformed_token_rejected(self, async_client, test_settings):
         """Garbage Bearer value → 401."""
-        client, _ = async_client
+        client, _, _ = async_client
         response = await client.get(
             "/api/orders",
             headers={"Authorization": "Bearer not.a.valid.jwt.at.all"},
@@ -166,7 +166,7 @@ class TestJWTKeyRotation:
         Token signed with the rotated private key and carrying kid-test-rotated
         must be accepted — the key store contains both primary and rotated keys.
         """
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         import httpx as _httpx
         from contextlib import asynccontextmanager
         @asynccontextmanager
@@ -195,7 +195,7 @@ class TestJWTKeyRotation:
         This verifies fail-closed behaviour — unknown key IDs are never
         silently ignored.
         """
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(kid="kid-unknown-attacker")
 
         response = await client.get(
@@ -214,7 +214,7 @@ class TestJWTKeyRotation:
         Token without a kid header must fall back to the first registered key
         (kid-test-2025 / primary) and be accepted.
         """
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         import httpx as _httpx
         from contextlib import asynccontextmanager
         @asynccontextmanager
@@ -245,7 +245,7 @@ class TestJWTKeyRotation:
         Token claiming kid-test-2025 (primary) but signed with the ROTATED private
         key must be rejected — signature verification catches the mismatch.
         """
-        client, _ = async_client
+        client, _, _ = async_client
         token = make_token(
             signing_key=rsa_rotated_private_key_pem,
             kid="kid-test-2025",      # claims primary kid but signed with rotated key
@@ -259,4 +259,45 @@ class TestJWTKeyRotation:
         assert response.status_code == 401, (
             f"Wrong key for valid kid must return 401, got {response.status_code}"
         )
+
+    async def test_jti_replay_protection(self, async_client, make_token):
+        """
+        [Phase 3] Test that the same token cannot be used twice (Replay Protection).
+        Stage 5 of the Security Pipeline.
+        """
+        client, mock_iiko, mock_redis = async_client
+        token = make_token()
+
+        # Mock successful proxy response for the first attempt
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            import httpx as _httpx
+            yield _httpx.Response(200, json={"ok": True})
+        from unittest.mock import MagicMock
+        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+
+        # First attempt: mock_redis.set returns True (new token)
+        mock_redis.set.return_value = True
+
+        response1 = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response1.status_code == 200
+        # Verify Redis was called with NX=True and some TTL
+        mock_redis.set.assert_called()
+        args, kwargs = mock_redis.set.call_args
+        assert kwargs["nx"] is True
+        assert kwargs["ex"] > 0
+
+        # Second attempt: mock_redis.set returns False/None (replay detected)
+        mock_redis.set.return_value = False
+
+        response2 = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response2.status_code == 401
+        assert response2.json()["detail"] == "Unauthorized"
 

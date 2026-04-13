@@ -18,7 +18,7 @@ class TestProxy:
         self, async_client, make_token, test_settings
     ):
         """200 from iiko → gateway returns 200, body can be read as stream."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         token = make_token(roles=["operator"])
         
         from contextlib import asynccontextmanager
@@ -44,7 +44,7 @@ class TestProxy:
         self, async_client, make_token, test_settings
     ):
         """Upstream timeout → 504, no internal error detail exposed."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         token = make_token(roles=["operator"])
         
         # [Fix] Async exception on initial call outside of context manager
@@ -70,7 +70,7 @@ class TestProxy:
         self, async_client, make_token, test_settings
     ):
         """Upstream connect error → 502, safe error message."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         token = make_token(roles=["operator"])
         from contextlib import asynccontextmanager
         @asynccontextmanager
@@ -139,7 +139,7 @@ class TestProxy:
 
     async def test_unauthenticated_request_not_proxied(self, async_client):
         """Request without token must be rejected before reaching iiko."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         mock_iiko.proxy_request_stream.reset_mock()
         response = await client.get("/api/orders")
         assert response.status_code in (401, 403)
@@ -149,7 +149,7 @@ class TestProxy:
         self, async_client, make_token, test_settings
     ):
         """'Server' and 'X-Powered-By' headers from iiko must not reach client."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         token = make_token(roles=["operator"])
 
         mock_response = httpx.Response(
@@ -180,7 +180,7 @@ class TestProxy:
 
     async def test_refresh_token_rejected_for_proxy(self, async_client, make_token, test_settings):
         """Negative test: a refresh token cannot be used to call the proxy API."""
-        client, mock_iiko = async_client
+        client, mock_iiko, _ = async_client
         mock_iiko.proxy_request_stream.reset_mock()
         token = make_token(token_type="refresh", roles=["operator"])
         

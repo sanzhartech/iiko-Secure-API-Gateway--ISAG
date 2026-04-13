@@ -11,7 +11,7 @@ from unittest.mock import patch, AsyncMock
 class TestAuthFlow:
     async def test_refresh_token_issues_new_pair(self, async_client, make_token, test_settings):
         """Happy path: valid refresh token gets a new access/refresh pair."""
-        client, _ = async_client
+        client, _, _ = async_client
         refresh_token = make_token(token_type="refresh", roles=[])
 
         # Mock the client retrieve call internally
@@ -39,7 +39,7 @@ class TestAuthFlow:
 
     async def test_access_token_rejected_at_refresh_endpoint(self, async_client, make_token, test_settings):
         """Negative test: access token cannot be used to refresh tokens."""
-        client, _ = async_client
+        client, _, _ = async_client
         access_token = make_token(token_type="access", roles=["operator"])
 
         response = await client.post(

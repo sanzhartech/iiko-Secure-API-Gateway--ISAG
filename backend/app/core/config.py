@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["json", "console"] = "json"
 
+    # ── Redis ────────────────────────────────────────────────────────────────
+    # [Phase 3] Redis URL for shared state (rate limiting, JTI store).
+    # Used by SlowAPI and JTIStore.
+    redis_url: str = "redis://redis:6379/1"
+    jti_expiry_buffer_seconds: int = 60
+
     # ── Private: RSA key cache (loaded once in model_post_init) ──────────────
     # [Fix 5]  Single private key, cached in-memory.
     # [KID]    Public keys stored as dict[kid → pem] for rotation support.
