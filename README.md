@@ -1,106 +1,77 @@
 # ISAG — iiko Secure API Gateway
 
-![CI Status](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-/actions/workflows/ci.yml/badge.svg)
-![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
+![CI Build](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.12-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-**ISAG (iiko Secure API Gateway)** — это защищенный высокопроизводительный обратный прокси-сервер, разработанный для безопасной интеграции с iiko API. Система реализует модель Zero-Trust и обеспечивает глубокую эшелонированную защиту (Defense-in-Depth) для внешних запросов.
+**ISAG (iiko Secure API Gateway)** — это асинхронный высокопроизводительный обратный прокси-сервер, разработанный для глубокой защиты интеграций с iiko API. Система реализует модель **Zero-Trust** и обеспечивает эшелонированную безопасность по принципу **Defense-in-Depth**.
 
 ---
 
-## 🚀 Основные возможности (Features)
+## 🛡️ Security Pipeline (9 Stages)
 
-- 🔒 **RS256 JWT Authentication**: Строгая проверка подписей и Payload (iss, aud, sub). Поддержка бесшовной ротации ключей через `KID`.
-- 🔄 **Replay Protection**: Защита от повторных атак с использованием JTI (JWT ID) и атомарных операций в Redis.
-- 🚦 **Distributed Rate Limiting**: Гибкие лимиты запросов на уровне IP и User ID, синхронизированные между экземплярами шлюза через Redis.
-- 🔐 **RBAC (Role-Based Access Control)**: Проверка прав доступа клиента перед проксированием запроса к iiko.
-- 🏗 **Secure Proxy Forwarding**: Автоматическое удаление опасных заголовков, подмена клиентских токенов на внутренние API-ключи iiko и защита от SSRF.
-- 🛡 **Path Traversal Protection**: Санитайзер путей для предотвращения попыток доступа к скрытым ресурсам.
-- 📈 **Full Observability**: Встроенный экспорт метрик в Prometheus и готовый дашборд в Grafana.
+Каждый запрос проходит через строго детерминированный пайплайн (LIFO Middleware Stack):
 
----
-
-## 🏗 Архитектура (Architecture)
-
-Проект построен на современном стеке технологий, ориентированном на безопасность и масштабируемость:
-
-- **Backend**: FastAPI (Python 3.12) — асинхронный и высокопроизводительный.
-- **Security Store**: Redis — используется для хранения JTI (защита от повторов) и счетчиков лимитов.
-- **Database**: SQLAlchemy 2.0 + SQLite (Async) — хранение данных клиентов и политик доступа.
-- **Observability**: Prometheus (сбор метрик) + Grafana (визуализация).
-- **Containerization**: Docker & Docker Compose.
+1.  **Transport Security**: HSTS, CSP, XSS protection.
+2.  **Request Size Gating**: Отсечка Payload > 10MB (DoS mitigation).
+3.  **Distributed Rate Limiting**: Троттлинг на базе Redis (IP/User/API).
+4.  **CORS Enforcement**: Строгий контроль источников запроса.
+5.  **Audit Logging**: Сбор метаданных для форензики.
+6.  **Telemetry**: Prometheus-инструментация с нормализацией путей.
+7.  **JWT RS256 Validation**: Криптографическая проверка подписи и Identity.
+8.  **Atomic Replay Protection**: Блокировка повторных атак через Redis JTI Store.
+9.  **RBAC Authorization**: Проверка прав доступа в реальном времени.
 
 ---
 
-## 🛡 Security Pipeline (Stage-by-Stage)
+## 🏗️ Технологический стек
 
-Каждый запрос проходит через 9 стадий проверки в строгом порядке (LIFO Stack):
-
-1️⃣ **TLS Termination** (на уровне внешнего прокси/LB).  
-2️⃣ **Request Size Validation**: Блокировка слишком тяжелых Payload.  
-3️⃣ **Rate Limiting**: Проверка лимитов (IP/User).  
-4️⃣ **JWT Validation**: Проверка подписи RS256, срока действия и эмитента.  
-5️⃣ **Replay Protection**: Проверка уникальности JTI в Redis.  
-6️⃣ **RBAC Authorization**: Проверка ролей для целевого ресурса.  
-7️⃣ **Secure Proxy Forwarding**: Мутация заголовков и маршрутизация.  
-8️⃣ **Audit Logging**: Запись события в структурированный JSON-лог.  
-9️⃣ **Response Filtering**: Удаление из ответа технических заголовков (`Server`, `X-Powered-By`).
+- **Backend**: FastAPI (Python 3.12) — High-performance async core.
+- **State Store**: Redis (Sentinel/Cluster ready) — JTI Registry & Rate Limits.
+- **Observability**: 
+  - **Prometheus**: Сбор метрик без Cardinality Explosion.
+  - **Grafana**: Визуализация атак, задержек и нагрузки.
+- **Infrastructure**: Docker & Docker Compose (Full-stack orchestration).
 
 ---
 
-## 🛠 Быстрый старт (Quickstart)
+## 🛠️ Быстрый старт (Quickstart)
 
-### 1. Подготовка окружения
-Клонируйте репозиторий и создайте файл `.env` из примера:
+### 1. Подготовка
 ```bash
 git clone https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-.git
 cd iiko-Secure-API-Gateway--ISAG-
 cp backend/.env.example backend/.env
 ```
 
-### 2. Генерация RSA-ключей
-Для работы JWT необходимо сгенерировать пару ключей:
+### 2. Генерация ключей
 ```bash
-cd backend
 python scripts/generate_keys.py
-cd ..
 ```
 
-### 3. Запуск всего стека
+### 3. Запуск
 ```bash
 docker-compose up -d --build
 ```
 
-После запуска сервисы будут доступны по адресам:
-- **API Gateway**: `http://localhost:8000`
-- **Swagger UI**: `http://localhost:8000/docs`
-- **Prometheus**: `http://localhost:9090`
-- **Grafana**: `http://localhost:3000` (логин: `admin`, пароль: `isag-grafana-2024`)
+---
+
+## 📈 Мониторинг и Стресс-тесты
+
+Для демонстрации защитных механизмов (429 Too Many Requests, 401 Unauthorized, Replay detection) используйте встроенный скрипт:
+```bash
+python scripts/stress_test.py --url http://localhost:8000
+```
+Затем откройте **Grafana** (`http://localhost:3000`), чтобы увидеть визуализацию заблокированных атак в реальном времени.
 
 ---
 
-## 🧪 Тестирование и Нагрузка
-
-### Запуск Unit-тестов:
-```bash
-cd backend
-pytest tests/ -v
-```
-
-### Запуск стресс-теста (симуляция атак):
-```bash
-python scripts/stress_test.py --url http://localhost:8000 --duration 120
-```
-
----
-
-## 📈 Мониторинг
-
-Дашборд Grafana (ISAG Dashboard) предоставляет визуализацию:
-- **RPS (Requests per second)** по кодам ответа.
-- **Latency P95/P99** (задержка проксирования).
-- **Security Block Distribution**: распределение причин блокировок (rate_limit, replay_attack, invalid_token).
+## 🔗 Документация (Deep Dive)
+- 📗 [Architecture Deep-Dive](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/ARCHITECTURE.md)
+- 📘 [Testing & Verification Report](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/TESTING_REPORT.md)
+- 📙 [API Specification](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/backend/API_SPEC.md)
+- 🏴 [Future Roadmap](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/ROADMAP.md)
 
 ---
 **Author**: Karzhaubayev Sanzhar  
-**Security Level**: Production-Oriented / Zero-Trust Model
+**Security Level**: Hardened (Level 5)

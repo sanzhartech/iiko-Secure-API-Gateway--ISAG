@@ -1,57 +1,36 @@
-# Project File Tree
+# ISAG — Final Directory Structure
 
 ```text
-backend/
-├── app/
-│   ├── api/                    # Stage 4 & 6
-│   │   ├── auth.py             # Token Issuance
-│   │   ├── proxy.py            # Streaming Proxy
-│   │   └── __init__.py
-│   ├── core/                   # Engine Room
-│   │   ├── config.py           # Settings & Key Cache
-│   │   ├── hashing.py          # Bcrypt logic
-│   │   ├── logging.py          # JSON Logging
-│   │   └── __init__.py
-│   ├── db/                     # Stage 3+ (Persistence)
-│   │   ├── base.py             # SQLAlchemy Base
-│   │   ├── engine.py           # Async Engine
-│   │   └── __init__.py
-│   ├── middleware/             # Stage 2, 3, 9 (The Shield)
-│   │   ├── rate_limiter.py     # Stage 3: Rate Limit
-│   │   ├── response_filter.py  # Stage 9: Filter
-│   │   ├── secure_headers.py   # HSTS/CSP Headers
-│   │   ├── size_validator.py   # Stage 2: Size Limit
-│   │   └── __init__.py
-│   ├── models/                 # Zero-Trust Entities
-│   │   ├── client.py           # Registry Client
-│   │   ├── user.py             # User models
-│   │   └── __init__.py
-│   ├── schemas/                # Strict Validation
-│   │   ├── token.py            # JWT Schemas
-│   │   └── __init__.py
-│   ├── security/               # The Hardened Core
-│   │   ├── audit.py            # Stage 8: Audit
-│   │   ├── jwt_validator.py    # Stage 4: JWT
-│   │   ├── rbac.py             # Stage 6: RBAC
-│   │   ├── replay.py           # Stage 5: Replay
-│   │   └── __init__.py
-│   ├── services/               # Integrations
-│   │   ├── client_service.py   # Registry logic
-│   │   ├── iiko_client.py      # Stage 7: Upstream
-│   │   └── __init__.py
-│   ├── main.py                 # Pipeline Assembly
-│   └── __init__.py
-├── keys/                       # RSA Keys
-├── tests/                      # Mandatory Tests
-│   ├── conftest.py
-│   ├── test_auth.py
-│   ├── test_jwt.py
-│   ├── test_proxy.py
-│   ├── test_rate_limit.py
-│   └── test_rbac.py
-├── .env                        # Configuration
-├── CODE_STRUCTURE.md           # Architecture Map
-├── FILE_TREE.md                # This file
-├── PROJECT_CONTEXT.md          # Domain Context
-└── requirements.txt            # Dependencies
+iiko-Secure-API-Gateway-ISAG/
+├── .github/workflows/          # [CI/CD] Automated Testing Pipeline
+│   └── ci.yml                  # GitHub Actions: Pytest + Redis
+├── backend/                    # Core Gateway Application
+│   ├── app/                    # Main Application Logic
+│   │   ├── api/                # [REST] Controllers & Route Definitions
+│   │   ├── core/               # [Shared] Config, Redis, Metrics, Logging
+│   │   ├── db/                 # [DB] Engine & Session Logic
+│   │   ├── middleware/         # [Pipeline] Security & Observation Middlewares
+│   │   ├── models/             # [Entity] User & Client Definitions
+│   │   ├── schemas/            # [DTW] Pydantic Validation Models
+│   │   ├── security/           # [Auth] JWT, JTI (Replay), RBAC logic
+│   │   ├── services/           # [Integration] Iiko Upstream Client
+│   │   └── main.py             # App Factory & Middleware Orchestration
+│   ├── keys/                   # [Security] RSA Private/Public Key Registry
+│   ├── scripts/                # [Utility] Generation & Stress-test scripts
+│   ├── tests/                  # [QA] Comprehensive 65-Test Suite
+│   ├── .env                    # Production/Local Environment Configuration
+│   ├── CODE_STRUCTURE.md       # Technical module breakdown
+│   ├── API_SPEC.md             # Interface Contract
+│   └── requirements.txt        # Production dependencies
+├── infrastructure/             # Orchestration & Monitoring Config
+│   ├── grafana/                # Grafana Dashboards & Provisioning
+│   └── prometheus/             # Prometheus Scrapers & Data Sources
+├── scripts/                    # Root Utility Scripts
+│   ├── stress_test.py          # Attack Simulation Engine
+│   └── generate_keys.py        # RS256 Key Pair Generator
+├── docker-compose.yml          # Full-Stack Orchestration (Gateway+Redis+Monitoring)
+├── ARCHITECTURE.md             # Deep Technical Analysis
+├── README.md                   # Project Showcase & Quickstart
+├── ROADMAP.md                  # Future Development & Scaling Vectors
+└── TESTING_REPORT.md           # Verification & Metric Proof
 ```
