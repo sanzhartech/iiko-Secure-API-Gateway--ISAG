@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.api import auth, proxy
+from app.api import auth, proxy, protected
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.middleware.rate_limiter import _on_rate_limit_exceeded, create_limiter, limiter
@@ -140,6 +140,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(auth.router)
     app.include_router(proxy.router)
+    app.include_router(protected.router)
 
     @app.get("/health", tags=["System"], include_in_schema=False)
     async def health() -> dict:
