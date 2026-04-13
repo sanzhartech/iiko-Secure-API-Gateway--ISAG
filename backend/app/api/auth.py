@@ -103,11 +103,20 @@ def _issue_refresh_token(sub: str, settings: Settings) -> str:
 @router.post(
     "/token",
     response_model=TokenResponse,
-    summary="Issue JWT access token",
-    description=(
-        "Exchange client credentials for a short-lived RS256-signed access token. "
-        "Subject to strict rate limiting (10/minute) to resist brute force."
-    ),
+    summary="Generate Access Token",
+    description="""
+**Issue a signed RS256 JWT access token.**
+
+This endpoint authenticates a gateway client using their unique `client_id` and `client_secret`. 
+If successful, it returns a pair of tokens:
+*   **Access Token**: Short-lived (15 min), used for authorizing API calls to iiko Proxy.
+*   **Refresh Token**: Long-lived (7 days), used to obtain new access tokens without re-sending credentials.
+
+**Security Controls**:
+- **Rate Limited**: 10 requests per minute to prevent brute-force attacks.
+- **Timing Safe**: Password verification uses constant-time comparison to prevent timing side-channel attacks.
+- **Fail-Safe**: Returns an identical 401 response for both unknown IDs and incorrect secrets.
+""",
 )
 @limiter.limit("10/minute")
 async def issue_token(
@@ -161,8 +170,18 @@ async def issue_token(
 @router.post(
     "/refresh",
     response_model=TokenResponse,
-    summary="Refresh access token",
-    description="Exchange a valid refresh token for a new access token and a new refresh token.",
+    summary="Renew Access Token",
+    description="""
+**Exchange a valid Refresh Token for a new token pair.**
+
+Allows clients to maintain a persistent session without storing their primary `client_secret` in long-term memory.
+The gateway validates the refresh token signature and expiry, then issues a fresh access token containing current roles and permissions.
+
+**Security Controls**:
+- **Type Enforcement**: Only tokens with `type: refresh` are accepted.
+- **Expiration Check**: Expired refresh tokens are strictly rejected.
+- **Audit Logged**: Every refresh event is tracked for security visibility.
+""",
 )
 @limiter.limit("10/minute")
 async def refresh_token(

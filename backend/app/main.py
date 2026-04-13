@@ -21,6 +21,7 @@ from app.middleware.secure_headers import SecureHeadersMiddleware
 from app.middleware.size_validator import RequestSizeValidatorMiddleware
 from app.middleware.response_filter import ResponseFilterMiddleware
 from app.security.audit import AuditLogMiddleware
+from app.middleware.metrics import MetricsMiddleware
 from app.core.redis import get_redis_service
 from app.services.iiko_client import IikoClient
 
@@ -95,8 +96,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings = get_settings()
 
     app = FastAPI(
-        title="iiko Secure API Gateway",
-        version="1.1.2",
+        title="ISAG — iiko Secure API Gateway",
+        description="""
+**ISAG (iiko Secure API Gateway)** is a hardened, high-performance reverse proxy designed specifically for secure integration with the iiko ERP/API ecosystem.
+
+### Key Security Features:
+*   🛡️ **RS256 JWT Validation**: Strict signature and claim verification.
+*   🔄 **Replay Protection**: JTI tracking via Redis to prevent token reuse.
+*   🚦 **Distributed Rate Limiting**: Per-IP and per-user limits using Redis.
+*   🔐 **RBAC Enforcement**: Fine-grained role-based access control.
+*   🔎 **Audit Logging**: Structured JSON logs for security monitoring.
+*   🧱 **Defense-in-Depth**: LIFO-ordered middleware pipeline for maximum security.
+
+---
+[Source Code](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-) | [Project Documentation](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-/blob/main/README.md)
+        """,
+        version="1.2.0",
+        contact={
+            "name": "Karzhaubayev Sanzhar",
+            "url": "https://github.com/sanzhartech",
+        },
+        license_info={
+            "name": "MIT License",
+        },
         lifespan=_make_lifespan(settings),
     )
 
@@ -129,6 +151,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Stage 9: Response Filtering (Innermost)
     app.add_middleware(ResponseFilterMiddleware)
+
+    # [Phase 5] Prometheus metrics instrumentation.
+    # Must be inner to AuditLog so it measures app processing time only.
+    app.add_middleware(MetricsMiddleware)
 
     # Stage 8: Audit Logging
     app.add_middleware(
@@ -175,6 +201,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health", tags=["System"], include_in_schema=False)
     async def health() -> dict:
         return {"status": "ok"}
+
+    @app.get("/ready", tags=["System"], include_in_schema=False)
+    async def ready() -> dict:
+        """Kubernetes-style readiness probe."""
+        return {"status": "ready"}
+
+    @app.get("/metrics", tags=["Observability"], include_in_schema=False)
+    async def metrics():  # type: ignore[return]
+        """
+        [Phase 5] Expose Prometheus metrics for scraping.
+
+        Intentionally UNAUTHENTICATED — Prometheus scrapers require direct
+        access. Restrict port 8000 at the network/firewall level in production.
+        """
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        from fastapi.responses import Response as FastAPIResponse
+        return FastAPIResponse(
+            content=generate_latest(),
+            media_type=CONTENT_TYPE_LATEST,
+        )
 
     return app
 

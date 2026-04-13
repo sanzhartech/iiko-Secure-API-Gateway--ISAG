@@ -1,0 +1,40 @@
+global:
+  scrape_interval: 15s       # How frequently to scrape targets
+  evaluation_interval: 15s   # How frequently to evaluate rules
+  scrape_timeout: 10s
+
+# Alertmanager configuration (optional — leave empty for diploma)
+alerting:
+  alertmanagers: []
+
+# Load rules from files in this directory
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+
+  # -------------------------------------------------------------------
+  # ISAG Gateway — primary metrics source
+  # The gateway exposes /metrics without authentication (Prometheus-safe).
+  # In production, restrict this port to the internal Docker network only.
+  # -------------------------------------------------------------------
+  - job_name: "isag_gateway"
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "gateway:8000"
+        labels:
+          environment: "production"
+          service: "isag-gateway"
+
+  # -------------------------------------------------------------------
+  # Redis — optional, requires redis_exporter sidecar for full metrics.
+  # Uncomment when redis_exporter is added to docker-compose.yml.
+  # -------------------------------------------------------------------
+  # - job_name: "isag_redis"
+  #   static_configs:
+  #     - targets:
+  #         - "redis-exporter:9121"
+  #       labels:
+  #         service: "redis"

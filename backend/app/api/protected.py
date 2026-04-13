@@ -39,8 +39,17 @@ logger = get_logger(__name__)
 
 @router.get(
     "/test",
-    summary="Protected test endpoint",
-    description="Requires a valid access token. Returns client identity. Use for demo.",
+    summary="Client Identity Check",
+    description="""
+**Demonstration endpoint for diploma defense.**
+
+This endpoint verifies that the gateway correctly:
+1.  **Extracts and parses** the RS256 JWT from the `Authorization` header.
+2.  **Enforces identity**: Only requests with `type: access` tokens are accepted.
+3.  **Parses claims**: Displays the `sub` (client_id) and `roles` encoded in your token.
+
+Use this to verify your authentication flow before calling the iiko Proxy.
+""",
 )
 async def protected_test(
     claims: Annotated[TokenClaims, Depends(get_current_claims)],

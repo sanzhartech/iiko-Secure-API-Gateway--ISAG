@@ -99,7 +99,13 @@ async def _forward(
 @router.api_route(
     "/{path:path}",
     methods=["GET"],
-    summary="Secure iiko proxy (read)",
+    summary="Proxy GET Request",
+    description="""
+Securely forwards a GET request to the iiko upstream API.
+- **Security**: Validates RS256 JWT, checks Replay Protection, and enforces `proxy:read` permission.
+- **Mutation**: Strips client `Authorization` and hop-by-hop headers; injects server-side `IIKO_API_KEY`.
+- **Observation**: Automatically logged and metered for latency and status codes.
+""",
     response_class=StreamingResponse,
 )
 @limiter.limit("50/minute")
@@ -118,7 +124,13 @@ async def proxy_read(
 @router.api_route(
     "/{path:path}",
     methods=["POST", "PUT", "PATCH", "DELETE"],
-    summary="Secure iiko proxy (write)",
+    summary="Proxy Mutation Request",
+    description="""
+Securely forwards a state-changing request (POST/PUT/PATCH/DELETE) to the iiko upstream API.
+- **Security**: Validates RS256 JWT, checks Replay Protection, and enforces `proxy:write` permission.
+- **Mutation**: Strips sensitive client headers and injects internal API credentials.
+- **Reliability**: Uses streaming for both request body and response to handle large payloads (e.g., menu sync).
+""",
     response_class=StreamingResponse,
 )
 @limiter.limit("50/minute")
