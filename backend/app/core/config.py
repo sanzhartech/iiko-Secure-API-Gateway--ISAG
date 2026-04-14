@@ -37,13 +37,16 @@ class Settings(BaseSettings):
     RSA keys are read once in model_post_init and cached in private attributes.
     All subsequent accesses hit memory only — no filesystem I/O.
     """
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="forbid",
     )
+
+    # ── Database ─────────────────────────────────────────────────────────────
+    # [Phase 8] SQLite/PostgreSQL connection string.
+    database_url: str = "sqlite+aiosqlite:///./gateway.db"
 
     # ── Application ──────────────────────────────────────────────────────────
     app_env: Literal["development", "production"] = "development"

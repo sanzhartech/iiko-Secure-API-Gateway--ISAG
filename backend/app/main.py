@@ -10,6 +10,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
@@ -97,16 +98,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="ISAG — iiko Secure API Gateway",
+        docs_url=None,  # ОТКЛЮЧАЕМ СТАНДАРТНЫЙ SWAGGER
         description="""
 **ISAG (iiko Secure API Gateway)** is a hardened, high-performance reverse proxy designed specifically for secure integration with the iiko ERP/API ecosystem.
 
 ### Key Security Features:
-*   🛡️ **RS256 JWT Validation**: Strict signature and claim verification.
-*   🔄 **Replay Protection**: JTI tracking via Redis to prevent token reuse.
-*   🚦 **Distributed Rate Limiting**: Per-IP and per-user limits using Redis.
-*   🔐 **RBAC Enforcement**: Fine-grained role-based access control.
-*   🔎 **Audit Logging**: Structured JSON logs for security monitoring.
-*   🧱 **Defense-in-Depth**: LIFO-ordered middleware pipeline for maximum security.
+* 🛡️ **RS256 JWT Validation**: Strict signature and claim verification.
+* 🔄 **Replay Protection**: JTI tracking via Redis to prevent token reuse.
+* 🚦 **Distributed Rate Limiting**: Per-IP and per-user limits using Redis.
+* 🔐 **RBAC Enforcement**: Fine-grained role-based access control.
+* 🔎 **Audit Logging**: Structured JSON logs for security monitoring.
+* 🧱 **Defense-in-Depth**: LIFO-ordered middleware pipeline for maximum security.
 
 ---
 [Source Code](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-) | [Project Documentation](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-/blob/main/README.md)
@@ -197,6 +199,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(proxy.router)
     app.include_router(protected.router)
+
+    # ── Custom Swagger UI Route ───────────────────────────────────────────────
+    @app.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui_html():
+        return get_swagger_ui_html(
+            openapi_url=app.openapi_url,
+            title=app.title + " - Swagger UI",
+            oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+            # Используем надежные CDN ссылки для обхода белого экрана
+            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
+            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+        )
 
     @app.get("/health", tags=["System"], include_in_schema=False)
     async def health() -> dict:

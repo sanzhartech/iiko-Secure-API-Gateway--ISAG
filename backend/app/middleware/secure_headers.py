@@ -8,7 +8,7 @@ HEADERS APPLIED:
   - X-Frame-Options             Prevents clickjacking
   - X-Content-Type-Options      Prevents MIME sniffing
   - Referrer-Policy             Limits referrer leakage
-  - Content-Security-Policy     Restrictive CSP
+  - Content-Security-Policy     Restrictive CSP (Configured for Swagger UI)
   - Permissions-Policy          Disables browser features
   - Cache-Control               No caching for API responses
 
@@ -40,8 +40,17 @@ _SECURITY_HEADERS: dict[str, str] = {
     "X-Content-Type-Options": "nosniff",
     # Restrictive referrer: send origin only on same-origin requests
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    # CSP: API-only service, no HTML/JS served — block everything
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    
+    # CSP: Allow Swagger UI assets to load from CDNs (jsdelivr/unpkg)
+    # while keeping everything else blocked (default-src 'none').
+    "Content-Security-Policy": (
+        "default-src 'none'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "frame-ancestors 'none'"
+    ),
+    
     # Disable browser features that have no relevance to an API
     "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
     # Do not cache API responses

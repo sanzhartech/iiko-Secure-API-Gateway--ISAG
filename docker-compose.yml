@@ -27,8 +27,7 @@ services:
           cpus: '0.10'
           memory: 128M
     healthcheck:
-      test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" ]
       interval: 30s
       timeout: 5s
       start_period: 15s
@@ -40,20 +39,18 @@ services:
   redis:
     image: redis:7-alpine
     container_name: iiko-redis
+    ports:
+      - "6379:6379" # <--- ДОБАВЬ ЭТИ ДВЕ СТРОЧКИ
     restart: unless-stopped
     command: >
-      redis-server
-      --save ""
-      --appendonly no
-      --maxmemory 128mb
-      --maxmemory-policy allkeys-lru
+      redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
     deploy:
       resources:
         limits:
           cpus: '0.20'
           memory: 256M
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -64,7 +61,7 @@ services:
     container_name: iiko-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"      # Prometheus UI — restrict in production
+      - "9090:9090" # Prometheus UI — restrict in production
     volumes:
       - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -82,7 +79,7 @@ services:
       gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:9090/-/healthy" ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -113,7 +110,7 @@ services:
       prometheus:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/api/health" ]
       interval: 30s
       timeout: 5s
       retries: 3

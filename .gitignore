@@ -40,3 +40,7 @@ revert_tests.py
 backend/keys/
 
 *.docx
+
+# ngrok
+ngrok.yml
+backend/ngrok.yml

@@ -12,21 +12,22 @@
 
 Каждый запрос проходит через строго детерминированный пайплайн (LIFO Middleware Stack):
 
-1.  **Transport Security**: HSTS, CSP, XSS protection.
+1.  **Transport Security**: HSTS, CSP, XSS protection (Secure Headers).
 2.  **Request Size Gating**: Отсечка Payload > 10MB (DoS mitigation).
 3.  **Distributed Rate Limiting**: Троттлинг на базе Redis (IP/User/API).
 4.  **CORS Enforcement**: Строгий контроль источников запроса.
-5.  **Audit Logging**: Сбор метаданных для форензики.
+5.  **Audit Logging**: Сбор метаданных для форензики (JSON structured).
 6.  **Telemetry**: Prometheus-инструментация с нормализацией путей.
-7.  **JWT RS256 Validation**: Криптографическая проверка подписи и Identity.
-8.  **Atomic Replay Protection**: Блокировка повторных атак через Redis JTI Store.
-9.  **RBAC Authorization**: Проверка прав доступа в реальном времени.
+7.  **JWT RS256 Validation**: Криптографическая проверка подписи, identity и **типа токена** (Access/Refresh).
+8.  **Atomic Replay Protection**: Блокировка повторных атак через Redis JTI Store (SET NX EX).
+9.  **RBAC Authorization**: Проверка прав доступа (`proxy:read`, `proxy:write`) в реальном времени.
 
 ---
 
 ## 🏗️ Технологический стек
 
 - **Backend**: FastAPI (Python 3.12) — High-performance async core.
+- **Database**: SQLite (SQLAlchemy 2.0 Async) — Persistent client registry с bcrypt-хешированием.
 - **State Store**: Redis (Sentinel/Cluster ready) — JTI Registry & Rate Limits.
 - **Observability**: 
   - **Prometheus**: Сбор метрик без Cardinality Explosion.
@@ -67,10 +68,11 @@ python scripts/stress_test.py --url http://localhost:8000
 ---
 
 ## 🔗 Документация (Deep Dive)
-- 📗 [Architecture Deep-Dive](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/ARCHITECTURE.md)
-- 📘 [Testing & Verification Report](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/TESTING_REPORT.md)
-- 📙 [API Specification](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/backend/API_SPEC.md)
-- 🏴 [Future Roadmap](file:///d:/Desktop/%D0%94%D0%B8%D0%BF%D0%BB%D0%BE%D0%BC%D0%BA%D0%B0%20-%20iiko%20Secure%20API%20Gateway%20%28ISAG%29/ROADMAP.md)
+- 📗 [Architecture Deep-Dive](ARCHITECTURE.md)
+- 📘 [Testing & Verification Report](TESTING_REPORT.md)
+- 📙 [API Specification](backend/API_SPEC.md)
+- 🏴 [Future Roadmap](ROADMAP.md)
+- 📝 [Debug Log & History](DEBUG_LOG.md)
 
 ---
 **Author**: Karzhaubayev Sanzhar  

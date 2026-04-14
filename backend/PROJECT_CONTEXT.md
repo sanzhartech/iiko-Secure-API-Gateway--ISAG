@@ -10,11 +10,12 @@ ISAG implements security as a layered onion. A single failure or misconfiguratio
 ### 🚦 Fail-Closed
 Security logic is deterministic. In any state of ambiguity — such as a missing configuration parameter, an unreachable Redis cluster, or a malformed security header — the gateway defaults to the most restrictive state (DENY).
 
-### 🔍 Zero-Trust
-Regardless of the network origin (even internal), every request must undergo:
-1.  Cryptographic Identity Verification (RS256).
-2.  Stateful Replay Verification (JTI/Redis).
-3.  Authorization Check (RBAC).
+### 🔍 Zero-Trust & Identity
+Regardless of the network origin, every request must undergo:
+1.  **Cryptographic Identity Verification** (RS256 JWT).
+2.  **Token Type Validation**: Access tokens for proxying, Refresh tokens for rotation.
+3.  **Stateful Replay Verification** (JTI/Redis).
+4.  **Authorization Check** (RBAC).
 
 ---
 
@@ -26,9 +27,9 @@ Requests traverse the following pipeline (LIFO middleware stack):
 2.  **Request Size Validation**: Immediate rejection of payloads exceeding 10MB to mitigate DoS.
 3.  **Distributed Rate Limiting**: Throttling via Redis to protect the gateway and upstream.
 4.  **CORS Enforcement**: Cross-origin policy validation.
-5.  **Audit Logging**: Metadata collection for security forensics.
-6.  **Telemetry**: Prometheus metrics instrumentation.
-7.  **Authentication & JTI**: JWT RS256 validation + atomic JTI replay check.
+5.  **Audit Logging**: Metadata collection for security forensics (with correlation IDs).
+6.  **Telemetry**: Prometheus metrics instrumentation with Path Normalization.
+7.  **Authentication & JTI**: JWT RS256 validation (with `kid` rotation) + atomic JTI replay check.
 8.  **RBAC Authorization**: Fine-grained role permission checks.
 9.  **Response Filtering (Innermost)**: Sanitizing outgoing headers (e.g., removing `Server` signatures).
 
@@ -37,17 +38,17 @@ Requests traverse the following pipeline (LIFO middleware stack):
 ## 3. Key Technical Decisions
 
 ### LIFO Middleware Stack
-Middleware in ISAG is registered in LIFO (Last-In-First-Out) order. This ensures that the most "expensive" or "dangerous" processing (like proxying) happens only after the "cheapest" validations (like Request Size and Rate Limiting) have passed.
+Middleware in ISAG is registered in LIFO (Last-In-First-Out) order. This ensures that the most "expensive" processing (like proxying) happens only after the "cheapest" validations (like Request Size and Rate Limiting) have passed.
 
 ### Redis Atomic SET NX EX
-To prevent Replay Attacks (token reuse), ISAG uses Redis `SET (key) 1 NX EX (ttl)`. This atomic operation ensures that even under extreme concurrency, a single `jti` cannot be validated twice, effectively eliminating Race Conditions.
+To prevent Replay Attacks, ISAG uses Redis `SET (key) 1 NX EX (ttl)`. This atomic operation ensures that even under extreme concurrency, a single `jti` cannot be validated twice.
 
-### Prometheus Cardinality Protection
-To prevent Prometheus from crashing due to high-cardinality label explosion, ISAG normalizes all incoming paths (e.g., `/api/orders/123` becomes `/api/{path}`) before recording metrics.
+### Persistent Client Registry
+Authentications are verified against an async SQLAlchemy database using Bcrypt for secret hashing, preventing data leakage in case of DB snapshots being compromised.
 
 ---
 
 ## 4. Operational Readiness
 - **Dockerized Stack**: Gateway + Redis + Prometheus + Grafana.
-- **CI/CD**: Automated GitHub Actions validating every push.
+- **CI/CD**: Automated GitHub Actions validating every push (65 tests).
 - **Secrets Management**: Fail-fast environment validation with `pydantic-settings`.
