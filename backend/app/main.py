@@ -96,24 +96,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings is None:
         settings = get_settings()
 
-    app = FastAPI(
-        title="ISAG — iiko Secure API Gateway",
-        docs_url=None,  # ОТКЛЮЧАЕМ СТАНДАРТНЫЙ SWAGGER
-        description="""
-**ISAG (iiko Secure API Gateway)** is a hardened, high-performance reverse proxy designed specifically for secure integration with the iiko ERP/API ecosystem.
+    tags_metadata = [
+        {"name": "Auth", "description": "Operations with authentication and tokens."},
+        {"name": "Gateway", "description": "Secure proxy forwarding to iiko upstream."},
+        {"name": "System", "description": "Liveness, readiness and system status."},
+        {"name": "Observability", "description": "Prometheus metrics and telemetry."},
+    ]
 
-### Key Security Features:
-* 🛡️ **RS256 JWT Validation**: Strict signature and claim verification.
-* 🔄 **Replay Protection**: JTI tracking via Redis to prevent token reuse.
-* 🚦 **Distributed Rate Limiting**: Per-IP and per-user limits using Redis.
-* 🔐 **RBAC Enforcement**: Fine-grained role-based access control.
-* 🔎 **Audit Logging**: Structured JSON logs for security monitoring.
-* 🧱 **Defense-in-Depth**: LIFO-ordered middleware pipeline for maximum security.
+    app = FastAPI(
+        title="ISAG - iiko Secure API Gateway",
+        description="""
+**ISAG (iiko Secure API Gateway)** — это защищенный асинхронный прокси-сервер для интеграции с iiko API.
+
+### Основные функции:
+* 🛡️ **JWT RS256**: Валидация подписи и типов токенов.
+* 🔄 **Replay Protection**: Redis-backed JTI tracking.
+* 🚦 **Rate Limiting**: Гибкое ограничение запросов (SlowAPI).
+* 🔐 **RBAC**: Управление доступом на основе ролей.
+* 🔎 **Audit Log**: Структурированные логи безопасности.
 
 ---
 [Source Code](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-) | [Project Documentation](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-/blob/main/README.md)
         """,
-        version="1.2.0",
+        version="1.0.0",
+        openapi_tags=tags_metadata,
+        openapi_extra={
+            "components": {
+                "securitySchemes": {
+                    "BearerAuth": {
+                        "type": "http",
+                        "scheme": "bearer",
+                        "bearerFormat": "JWT",
+                        "description": "Введите JWT токен: **Bearer [token]**"
+                    }
+                }
+            },
+            "security": [{"BearerAuth": []}],
+        },
+        docs_url=None,
         contact={
             "name": "Karzhaubayev Sanzhar",
             "url": "https://github.com/sanzhartech",
@@ -196,9 +216,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _on_rate_limit_exceeded)
 
     # ── Routers ───────────────────────────────────────────────────────────────
-    app.include_router(auth.router)
-    app.include_router(proxy.router)
-    app.include_router(protected.router)
+    app.include_router(auth.router, tags=["Auth"])
+    app.include_router(proxy.router, tags=["Gateway"])
+    app.include_router(protected.router, tags=["Gateway"])
 
     # ── Custom Swagger UI Route ───────────────────────────────────────────────
     @app.get("/docs", include_in_schema=False)

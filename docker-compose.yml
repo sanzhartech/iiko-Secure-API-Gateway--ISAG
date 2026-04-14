@@ -11,6 +11,7 @@ services:
       - ./backend/.env
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/gateway.db
+      - REDIS_URL=redis://iiko-redis:6379/1
       - APP_ENV=production
     volumes:
       # Data persistence for SQLite and logs
@@ -33,14 +34,14 @@ services:
       start_period: 15s
       retries: 3
     depends_on:
-      redis:
+      iiko-redis:
         condition: service_healthy
 
-  redis:
+  iiko-redis:
     image: redis:7-alpine
     container_name: iiko-redis
     ports:
-      - "6379:6379" # <--- ДОБАВЬ ЭТИ ДВЕ СТРОЧКИ
+      - "6379:6379"
     restart: unless-stopped
     command: >
       redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru

@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     # ── Redis ────────────────────────────────────────────────────────────────
     # [Phase 3] Redis URL for shared state (rate limiting, JTI store).
     # Used by SlowAPI and JTIStore.
-    redis_url: str = "redis://redis:6379/1"
+    redis_url: str = "redis://iiko-redis:6379/1"
     jti_expiry_buffer_seconds: int = 60
 
     # ── Private: RSA key cache (loaded once in model_post_init) ──────────────
