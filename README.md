@@ -1,4 +1,5 @@
 # ISAG — iiko Secure API Gateway
+<img width="6250" height="6250" alt="PNG-1" src="https://github.com/user-attachments/assets/d76e9da1-f2b0-4154-9985-b66388c70e39" />
 
 ![CI Build](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.12-blue.svg)
