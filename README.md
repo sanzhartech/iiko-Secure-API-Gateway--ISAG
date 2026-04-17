@@ -1,5 +1,6 @@
 # ISAG — iiko Secure API Gateway
-<img width="3211" height="3206" alt="PNG-1 — копия" src="https://github.com/user-attachments/assets/f7537ee4-d508-4554-82ee-2b7aa6e89458" />
+<img width="513" height="512" alt="PNG-1 — копия (1)" src="https://github.com/user-attachments/assets/451b0c91-5102-474a-8aa4-6b204e3224ad" />
+
 
 
 ![CI Build](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-/actions/workflows/ci.yml/badge.svg)
