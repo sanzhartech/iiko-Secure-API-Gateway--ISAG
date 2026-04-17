@@ -1,5 +1,6 @@
 # ISAG — iiko Secure API Gateway
-<img width="513" height="512" alt="PNG-1 — копия (1)" src="https://github.com/user-attachments/assets/451b0c91-5102-474a-8aa4-6b204e3224ad" />
+<img width="1200" height="800" alt="PNG (1)" src="https://github.com/user-attachments/assets/faafb19b-5485-470c-9b7c-8d337369dd63" />
+
 
 
 
