@@ -201,7 +201,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestSizeValidatorMiddleware, max_upload_size=10 * 1024 * 1024)
 
     # Stage 1: Transport Security & Headers (Outermost)
-    app.add_middleware(SecureHeadersMiddleware)
+    #app.add_middleware(SecureHeadersMiddleware)
 
     # [Fix #5] Use the global limiter singleton but ensure it uses the
     # default limit and Redis storage from settings.

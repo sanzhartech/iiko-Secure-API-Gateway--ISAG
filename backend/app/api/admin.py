@@ -18,7 +18,7 @@ from app.schemas.admin import (
 )
 from app.core.hashing import get_password_hash
 from app.schemas.token import TokenClaims
-from app.security.jwt_validator import get_current_user_claims
+from app.security.jwt_validator import get_current_claims
 from app.core.logging import get_logger
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 
 # --- Dependency ---
 
-def get_current_admin(claims: Annotated[TokenClaims, Depends(get_current_user_claims)]) -> TokenClaims:
+def get_current_admin(claims: Annotated[TokenClaims, Depends(get_current_claims)]) -> TokenClaims:
     """
     Ensure the current authenticated user/client has the 'admin' role.
     """

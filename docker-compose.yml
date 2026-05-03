@@ -41,7 +41,7 @@ services:
       - IIKO_API_BASE_URL=https://api-ru.iiko.services
       - IIKO_API_KEY=dummy_key
       - GATEWAY_CLIENT_SECRET=dummy_secret
-      - JWT_ACTIVE_KID=primary-1
+      - JWT_ACTIVE_KID=default
       - RATE_LIMIT_PER_IP=100/minute
       - RATE_LIMIT_PER_USER=50/minute
       - RATE_LIMIT_AUTH_ENDPOINT=10/minute
