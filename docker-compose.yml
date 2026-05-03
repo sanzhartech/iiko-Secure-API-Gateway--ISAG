@@ -1,125 +1,78 @@
 services:
-  gateway:
+  db:
+    image: postgres:15-alpine
+    container_name: isag-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: isag_admin
+      POSTGRES_PASSWORD: isag_secure_password
+      POSTGRES_DB: isag_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U isag_admin -d isag_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: isag-redis
+    restart: unless-stopped
+    command: >
+      redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: iiko-secure-gateway
+    container_name: isag-backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:////app/data/gateway.db
-      - REDIS_URL=redis://iiko-redis:6379/1
+      - DATABASE_URL=postgresql+asyncpg://isag_admin:isag_secure_password@db:5432/isag_db
+      - REDIS_URL=redis://redis:6379/0
       - APP_ENV=production
+      # Example dummy keys/secrets for quickstart
+      - IIKO_API_BASE_URL=https://api-ru.iiko.services
+      - IIKO_API_KEY=dummy_key
+      - GATEWAY_CLIENT_SECRET=dummy_secret
+      - JWT_ACTIVE_KID=primary-1
+      - RATE_LIMIT_PER_IP=100/minute
+      - RATE_LIMIT_PER_USER=50/minute
+      - RATE_LIMIT_AUTH_ENDPOINT=10/minute
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin
     volumes:
-      # Data persistence for SQLite and logs
-      - gateway_data:/app/data
-      # [Rule 3] Critical: Mount RSA keys in Read-Only mode
       - ./backend/keys:/app/keys:ro
-    # [Rule 12] Stage 2: Protection against Resource Exhaustion
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
-        reservations:
-          cpus: '0.10'
-          memory: 128M
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" ]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 5s
       start_period: 15s
       retries: 3
-    depends_on:
-      iiko-redis:
-        condition: service_healthy
 
-  iiko-redis:
-    image: redis:7-alpine
-    container_name: iiko-redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    command: >
-      redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
-    deploy:
-      resources:
-        limits:
-          cpus: '0.20'
-          memory: 256M
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    # Security: No ports exposed to host. Only internal container network access.
-
-  prometheus:
-    image: prom/prometheus:v2.51.2
-    container_name: iiko-prometheus
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: isag-frontend
     restart: unless-stopped
     ports:
-      - "9090:9090" # Prometheus UI — restrict in production
-    volumes:
-      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=7d"
-      - "--web.enable-lifecycle"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
+      - "80:80"
     depends_on:
-      gateway:
+      backend:
         condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:9090/-/healthy" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  grafana:
-    image: grafana/grafana:10.4.2
-    container_name: iiko-grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=isag-grafana-2024
-      - GF_AUTH_ANONYMOUS_ENABLED=false
-      - GF_USERS_ALLOW_SIGN_UP=false
-      # Disable telemetry for privacy
-      - GF_ANALYTICS_REPORTING_ENABLED=false
-      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
-    volumes:
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana_data:/var/lib/grafana
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-    depends_on:
-      prometheus:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/api/health" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
 
 volumes:
-  gateway_data:
-    name: isag_gateway_data
-  prometheus_data:
-    name: isag_prometheus_data
-  grafana_data:
-    name: isag_grafana_data
+  postgres_data:
+    name: isag_postgres_data

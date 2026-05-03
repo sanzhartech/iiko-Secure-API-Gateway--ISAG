@@ -14,7 +14,7 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.api import auth, proxy, protected
+from app.api import auth, proxy, protected, admin
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.middleware.rate_limiter import _on_rate_limit_exceeded, create_limiter, limiter
@@ -219,6 +219,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router, tags=["Auth"])
     app.include_router(proxy.router, tags=["Gateway"])
     app.include_router(protected.router, tags=["Gateway"])
+    app.include_router(admin.router, tags=["Admin"])
 
     # ── Custom Swagger UI Route ───────────────────────────────────────────────
     @app.get("/docs", include_in_schema=False)

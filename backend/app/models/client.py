@@ -16,4 +16,6 @@ class GatewayClient(Base):
     client_id: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
     hashed_secret: Mapped[str] = mapped_column(String(512), nullable=False)
     roles: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    rate_limit: Mapped[int] = mapped_column(default=10, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

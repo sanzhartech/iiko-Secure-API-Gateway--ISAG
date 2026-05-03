@@ -1,83 +1,91 @@
 # ISAG — iiko Secure API Gateway
-<img width="1200" height="800" alt="PNG (1)" src="https://github.com/user-attachments/assets/faafb19b-5485-470c-9b7c-8d337369dd63" />
 
+**ISAG (iiko Secure API Gateway)** is a high-performance, asynchronous reverse proxy designed to secure integrations with the iiko API. Operating on a **Zero-Trust** model, it enforces Defense-in-Depth security principles while providing a modern, high-fidelity administrative dashboard.
 
+## 🌟 Core Features
 
+- **Zero Trust Architecture**: Every request is cryptographically verified (JWT RS256) and strictly authorized via RBAC.
+- **Glassmorphism UI**: A stunning, premium React/Vite dashboard featuring dynamic animations, fluid transitions, and responsive design.
+- **Real-time Threat Feed**: The dashboard features a "Live Event Ticker" mapping recent security events (e.g., token revocation, rate limits) with immediate visual feedback.
+- **Audit Logging**: Comprehensive, JSON-structured tracking of administrative actions (Client Creation, Secret Rotation, Status Toggling) with IP tracking.
+- **Secret Rotation**: Secure, on-demand client credential lifecycle management directly from the UI without service interruption.
 
 [![CI — ISAG Test Suite](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-**ISAG (iiko Secure API Gateway)** — это асинхронный высокопроизводительный обратный прокси-сервер, разработанный для глубокой защиты интеграций с iiko API. Система реализует модель **Zero-Trust** и обеспечивает эшелонированную безопасность по принципу **Defense-in-Depth**.
+## 🏗️ Architecture
 
----
+```mermaid
+graph LR
+    A[Client App] -->|HTTPS Request| B(ISAG Nginx/Proxy)
+    B --> C{ISAG Backend}
+    
+    subgraph Security Pipeline
+        C -->|1. Rate Limit Check| D[Redis]
+        C -->|2. JWT Verification| E[RSA Keys]
+        C -->|3. RBAC & Scopes| F[(PostgreSQL)]
+    end
+    
+    C -->|Secure Proxy| G[iiko API Upstream]
+    
+    H[Admin User] -->|Manage| I[ISAG Admin UI]
+    I -->|API Calls| C
+```
 
-## 🛡️ Security Pipeline (9 Stages)
+## 🛡️ Security Features
 
-Каждый запрос проходит через строго детерминированный пайплайн (LIFO Middleware Stack):
+- **Scopes & Granular Access**: Each client is provisioned with specific API scopes (e.g., `orders:read`), ensuring they can only access the endpoints they explicitly need.
+- **Rate Limits**: Configurable per-client and global rate limits prevent abuse, resource exhaustion, and DoS attacks.
+- **Replay Protection**: Strict JWT ID (JTI) tracking prevents captured tokens from being reused.
 
-1.  **Transport Security**: HSTS, CSP, XSS protection (Secure Headers).
-2.  **Request Size Gating**: Отсечка Payload > 10MB (DoS mitigation).
-3.  **Distributed Rate Limiting**: Троттлинг на базе Redis (IP/User/API).
-4.  **CORS Enforcement**: Строгий контроль источников запроса.
-5.  **Audit Logging**: Сбор метаданных для форензики (JSON structured).
-6.  **Telemetry**: Prometheus-инструментация с нормализацией путей.
-7.  **JWT RS256 Validation**: Криптографическая проверка подписи, identity и **типа токена** (Access/Refresh).
-8.  **Atomic Replay Protection**: Блокировка повторных атак через Redis JTI Store (SET NX EX).
-9.  **RBAC Authorization**: Проверка прав доступа (`proxy:read`, `proxy:write`) в реальном времени.
+## 🚀 Quick Start (One-Click Deployment)
 
----
+Ensure you have Docker and Docker Compose installed.
 
-## 🏗️ Технологический стек
-
-- **Backend**: FastAPI (Python 3.12) — High-performance async core.
-- **Database**: SQLite (SQLAlchemy 2.0 Async) — Persistent client registry с bcrypt-хешированием.
-- **State Store**: Redis (Sentinel/Cluster ready) — JTI Registry & Rate Limits.
-- **Observability**: 
-  - **Prometheus**: Сбор метрик без Cardinality Explosion.
-  - **Grafana**: Визуализация атак, задержек и нагрузки.
-- **Infrastructure**: Docker & Docker Compose (Full-stack orchestration).
-
----
-
-## 🛠️ Быстрый старт (Quickstart)
-
-### 1. Подготовка
+### 1. Clone & Configure
 ```bash
 git clone https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-.git
 cd iiko-Secure-API-Gateway--ISAG-
-cp backend/.env.example backend/.env
 ```
 
-### 2. Генерация ключей
+### 2. Generate RSA Keys
+Before starting, generate the secure keys used for JWT signing:
 ```bash
 python scripts/generate_keys.py
 ```
 
-### 3. Запуск
+### 3. Launch the Stack
+Deploy the Postgres database, Redis cache, FastAPI backend, and React/Nginx frontend:
 ```bash
 docker-compose up -d --build
 ```
 
+### 4. Access the Dashboard
+Open your browser and navigate to:
+**http://localhost**
+
+Log in using the default credentials specified in your `docker-compose.yml`.
+
 ---
 
-## 📈 Мониторинг и Стресс-тесты
+## 🛠️ Demo & Defense Presentation
 
-Для демонстрации защитных механизмов (429 Too Many Requests, 401 Unauthorized, Replay detection) используйте встроенный скрипт:
+To demonstrate the gateway's real-time defensive capabilities during a presentation, run the provided `demo_attack.py` script:
+
 ```bash
-python scripts/stress_test.py --url http://localhost:8000
+# Requires python requests library
+pip install requests colorama
+python demo_attack.py
 ```
-Затем откройте **Grafana** (`http://localhost:3000`), чтобы увидеть визуализацию заблокированных атак в реальном времени.
 
----
+This script will:
+1. Send valid requests (showing the "Network Pulse").
+2. Send an aggressive burst to trigger `RATE_LIMIT_EXCEEDED` (Crimson Red glow in the Live Feed).
+3. Send forged tokens to demonstrate `UNAUTHORIZED` blocks.
 
-## 🔗 Документация (Deep Dive)
-- 📗 [Architecture Deep-Dive](ARCHITECTURE.md)
-- 📘 [Testing & Verification Report](TESTING_REPORT.md)
-- 📙 [API Specification](backend/API_SPEC.md)
-- 🏴 [Future Roadmap](ROADMAP.md)
-- 📝 [Debug Log & History](DEBUG_LOG.md)
+Watch the Admin Dashboard react to these events in real-time!
 
 ---
 **Author**: Karzhaubayev Sanzhar  
-**Security Level**: Hardened (Level 5)
+**Status**: Production-Ready / Diploma Defense Candidate
