@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import './Toast.css';
-import { XCircle, CheckCircle } from 'lucide-react';
+import { XCircle, CheckCircle, Info } from 'lucide-react';
 
-type ToastType = 'success' | 'error';
+type ToastType = 'success' | 'error' | 'info';
 
 interface ToastMessage {
   id: number;
@@ -36,8 +36,10 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           <div key={toast.id} className={`toast glass-card ${toast.type}`}>
             {toast.type === 'success' ? (
               <CheckCircle size={20} className="toast-icon success" />
-            ) : (
+            ) : toast.type === 'error' ? (
               <XCircle size={20} className="toast-icon error" />
+            ) : (
+              <Info size={20} className="toast-icon info" />
             )}
             <span className="toast-message">{toast.message}</span>
           </div>

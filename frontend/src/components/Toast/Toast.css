@@ -30,12 +30,21 @@
   box-shadow: 0 0 16px var(--accent-crimson-glow);
 }
 
+.toast.info {
+  border-color: var(--accent-cyan-glow);
+  box-shadow: 0 0 16px var(--accent-cyan-glow);
+}
+
 .toast-icon.success {
   color: var(--accent-cyan);
 }
 
 .toast-icon.error {
   color: var(--accent-crimson);
+}
+
+.toast-icon.info {
+  color: var(--accent-cyan);
 }
 
 .toast-message {
