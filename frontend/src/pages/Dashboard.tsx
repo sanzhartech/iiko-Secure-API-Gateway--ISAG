@@ -5,6 +5,7 @@ import { apiClient } from '../services/apiClient';
 import MetricsChart from '../components/Charts/MetricsChart';
 import SecurityScore from '../components/Charts/SecurityScore';
 import LiveEvents from '../components/Dashboard/LiveEvents';
+import { useToast } from '../components/Toast/ToastContext';
 
 interface AuditLog {
   id: string;
@@ -35,6 +36,7 @@ export const Dashboard: React.FC = () => {
   const [pulseActive, setPulseActive] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -46,8 +48,13 @@ export const Dashboard: React.FC = () => {
         setPulseActive(false);
         setTimeout(() => setPulseActive(true), 50);
         setError(null);
-      } catch (err: unknown) {
-        setError('Failed to load metrics. Is the gateway running?');
+      } catch (err: any) {
+        // If it's a 401, the interceptor will handle it.
+        // For other errors, we just show a toast and keep existing data.
+        if (err.response?.status !== 401) {
+          showToast('Failed to refresh metrics. Retrying...', 'error');
+          setError('Data sync error');
+        }
       } finally {
         setLoading(false);
       }
@@ -57,10 +64,9 @@ export const Dashboard: React.FC = () => {
     // Real-time polling every 5 seconds
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [showToast]);
 
-  if (loading && !stats) return <div className="glass-card">Loading metrics...</div>;
-  if (error) return <div className="glass-card" style={{ color: 'var(--accent-crimson)' }}>{error}</div>;
+  if (loading && !stats) return <div className="glass-card" style={{ padding: '32px' }}>Loading gateway status...</div>;
 
   return (
     <div style={{ padding: '32px' }}>

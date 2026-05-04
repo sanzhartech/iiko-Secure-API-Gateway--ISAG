@@ -5,7 +5,7 @@
 The verification of the iiko Secure API Gateway (ISAG) follows a **Pyramid Testing Model**, ensuring robustness across all security stages.
 
 ### Unit & Integration Testing
-- **Suite Size**: 65 Comprehensive Tests.
+- **Suite Size**: 68 Comprehensive Tests.
 - **Tools**: `pytest`, `pytest-asyncio`, `pytest-cov`, `respx`.
 - **Key Strategy**:
     - **Isolation**: All tests run without external dependencies (Redis and Database are mocked via fixtures in `conftest.py`).
@@ -19,7 +19,7 @@ The verification of the iiko Secure API Gateway (ISAG) follows a **Pyramid Testi
 
 | Metric | Result | Status |
 | :--- | :--- | :--- |
-| **Test Pass Rate** | 100% (65/65 passed) | ✅ Pass |
+| **Test Pass Rate** | 100% (68/68 passed) | ✅ Pass |
 | **Code Coverage** | 83% (Core Security) | ✅ Pass |
 | **Fail-Closed Logic** | 100% Verified | ✅ Pass |
 | **Flakiness** | 0% (Stable environment) | ✅ Pass |
@@ -53,4 +53,4 @@ The automated verification pipeline runs on every push:
 1. **Environment Setup**: Python 3.12 + Redis Service Container.
 2. **Database Migration**: Init SQLite schema for registry tests.
 3. **Security Test Suite**: `pytest tests/ --cov=app`.
-4. **Outcome**: Deployment is blocked unless all 65 tests pass.
+4. **Outcome**: Deployment is blocked unless all 68 tests pass.

@@ -1,6 +1,6 @@
 # ISAG — Future Roadmap & Scaling Vectors
 
-As of 2026-04-14, the iiko Secure API Gateway is 100% completed and production-ready. This document outlines strategic vectors for future scaling and enterprise hardening.
+As of 2026-05-04, the iiko Secure API Gateway is 100% completed, hardened, and documented. This document outlines strategic vectors for future scaling and enterprise hardening.
 
 ## 1. Enterprise Secret Management
 - **HashiCorp Vault Integration**: Transition from local `keys/` storage and `.env` secrets to a centralized secrets engine with automated RSA key rotation via Vault's Transit engine.
@@ -30,3 +30,5 @@ As of 2026-04-14, the iiko Secure API Gateway is 100% completed and production-r
 - [x] **DB-Backed Registry**: SQLAlchemy 2.0 with Bcrypt security.
 - [x] **Refresh Token Flow**: Secure rotation and type separation.
 - [x] **Full Observability Stack**: Prometheus + Grafana instrumentation.
+- [x] **High-Fidelity Documentation**: Academic technical report included.
+- [x] **Frontend Stability**: JTI Grace Period implemented for parallel fetching.

@@ -37,8 +37,11 @@ export const Login: React.FC = () => {
     } catch (err: any) {
       if (err.response?.status === 401) {
         showToast('Invalid credentials or insufficient permissions', 'error');
+      } else if (err.response?.status === 422) {
+        showToast('Validation error. Check if ID or Secret are too short.', 'error');
       } else {
-        showToast('Connection error. Is the gateway running?', 'error');
+        console.error('Login error:', err);
+        showToast('Connection error. Is the gateway running on port 8000?', 'error');
       }
     } finally {
       setLoading(false);

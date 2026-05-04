@@ -30,13 +30,13 @@ class TokenClaims(BaseModel):
     iat: int = Field(..., description="Issued-at timestamp (Unix)")
 
 
-class TokenRequest(BaseModel):
+class LoginRequest(BaseModel):
     """Request body for POST /auth/token."""
 
     model_config = ConfigDict(extra="forbid")
 
     client_id: str = Field(..., min_length=1, max_length=128)
-    client_secret: str = Field(..., min_length=8, max_length=512)
+    client_secret: str = Field(..., min_length=4, max_length=512)
 
 
 class TokenResponse(BaseModel):

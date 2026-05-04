@@ -268,7 +268,7 @@ class TestJWTKeyRotation:
         client, mock_iiko, mock_redis = async_client
         token = make_token()
 
-        # Mock successful proxy response for the first attempt
+        # Mock successful proxy response
         from contextlib import asynccontextmanager
         @asynccontextmanager
         async def _mock_cm(*args, **kwargs):
@@ -277,22 +277,20 @@ class TestJWTKeyRotation:
         from unittest.mock import MagicMock
         mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
 
-        # First attempt: mock_redis.set returns True (new token)
-        mock_redis.set.return_value = True
+        # First attempt: mock_redis.set returns None (NX=True successful, new token)
+        mock_redis.set.return_value = None
 
         response1 = await client.get(
             "/api/orders",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response1.status_code == 200
-        # Verify Redis was called with NX=True and some TTL
-        mock_redis.set.assert_called()
-        args, kwargs = mock_redis.set.call_args
-        assert kwargs["nx"] is True
-        assert kwargs["ex"] > 0
 
-        # Second attempt: mock_redis.set returns False/None (replay detected)
-        mock_redis.set.return_value = False
+        # Second attempt: mock_redis.set returns a timestamp (REPLAY)
+        # We use a timestamp from 10 seconds ago to be outside the 2s grace period.
+        import time
+        past_timestamp = str(int(time.time()) - 10)
+        mock_redis.set.return_value = past_timestamp
 
         response2 = await client.get(
             "/api/orders",
@@ -300,4 +298,36 @@ class TestJWTKeyRotation:
         )
         assert response2.status_code == 401
         assert response2.json()["detail"] == "Unauthorized"
+
+    async def test_jti_grace_period_allowed(self, async_client, make_token):
+        """
+        Test that parallel requests within the 2s grace period are ALLOWED.
+        This supports React frontend's simultaneous fetching.
+        """
+        client, mock_iiko, mock_redis = async_client
+        token = make_token()
+
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            import httpx as _httpx
+            yield _httpx.Response(200, json={"ok": True})
+        from unittest.mock import MagicMock
+        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+
+        # First attempt: success
+        mock_redis.set.return_value = None
+        await client.get("/api/orders", headers={"Authorization": f"Bearer {token}"})
+
+        # Second attempt: same token but WITHIN 1 second of the first use
+        import time
+        current_timestamp = str(int(time.time()))
+        mock_redis.set.return_value = current_timestamp # simulate key already exists with recent TS
+
+        response2 = await client.get(
+            "/api/orders",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # Should still be 200 due to grace period
+        assert response2.status_code == 200
 

@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     jwt_algorithm: Literal["RS256"] = "RS256"
     jwt_issuer: str = "isag.internal"
     jwt_audience: str = "isag-clients"
-    jwt_access_token_expire_minutes: int = 15
+    jwt_access_token_expire_minutes: int = 60
     # [Fix #4] PLACEHOLDER — no refresh endpoint implemented yet.
     # This value is currently unused by any production code.
     # Either implement /auth/refresh or remove this field before going to production.
@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     rate_limit_per_user: str = "50/minute"
     rate_limit_auth_endpoint: str = "10/minute"
 
+    admin_username: str = "admin"
+    admin_password: str = "admin"
+
     # ── CORS ─────────────────────────────────────────────────────────────────
     cors_allowed_origins: str = ""
     cors_allow_credentials: bool = False
@@ -108,6 +111,7 @@ class Settings(BaseSettings):
     # Used by SlowAPI and JTIStore.
     redis_url: str = "redis://iiko-redis:6379/1"
     jti_expiry_buffer_seconds: int = 60
+    jti_replay_grace_period_seconds: int = 2
 
     # ── Private: RSA key cache (loaded once in model_post_init) ──────────────
     # [Fix 5]  Single private key, cached in-memory.

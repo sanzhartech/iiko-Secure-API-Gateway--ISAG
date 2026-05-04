@@ -173,6 +173,7 @@ def test_settings(tmp_path_factory, rsa_private_key_pem, rsa_public_key_pem, rsa
     os.environ["JWT_PUBLIC_KEYS_PATH"] = str(public_keys_path)
     os.environ["JWT_ACTIVE_KID"] = "primary-1"
     
+    os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
     os.environ.pop("PYTHON_PATH", None)
 
     from app.core.config import Settings
@@ -251,15 +252,20 @@ async def async_client(test_settings):
         
     application.dependency_overrides[get_settings] = override_get_settings
 
-    # Inject mock iiko client BEFORE the app starts (lifespan will skip init
+    # [Fix] Explicitly initialize DB for tests to avoid "no such table" errors
+    from app.db.engine import init_db
+    await init_db()
+
+    # Inject mock iiko client BEFORE the app starts
     # because app.state.iiko_client is already set)
     mock_iiko = AsyncMock()
     application.state.iiko_client = mock_iiko
 
     # [Phase 3] Mock Redis for JTI Store
     mock_redis = AsyncMock()
-    # Mock SET ... NX EX behavior: True means success (new token), None/False means replay
-    mock_redis.set.return_value = True 
+    # Mock SET ... NX GET behavior: None means success (new token), 
+    # anything else means key already exists (simulates GET returning old value)
+    mock_redis.set.return_value = None 
     
     from app.core.redis import get_redis, get_redis_service
     
@@ -288,5 +294,5 @@ def reset_mocks(async_client):
     _, mock_iiko, mock_redis = async_client
     mock_iiko.reset_mock()
     mock_redis.reset_mock()
-    # Ensure JTI checks pass by default
-    mock_redis.set.return_value = True
+    # Ensure JTI checks pass by default (None = key created)
+    mock_redis.set.return_value = None

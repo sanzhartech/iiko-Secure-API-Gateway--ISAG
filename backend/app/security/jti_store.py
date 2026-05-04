@@ -27,6 +27,7 @@ class JTIStore:
         self._redis = redis_client
         self._prefix = "isag:jti:"
         self._buffer = settings.jti_expiry_buffer_seconds
+        self._grace_period = settings.jti_replay_grace_period_seconds
 
     async def is_replay(self, jti: str, expires_at: int) -> bool:
         """
@@ -37,25 +38,41 @@ class JTIStore:
             expires_at: Unix timestamp when the token expires.
 
         Returns:
-            True if this is a replay (JTI already exists).
-            False if this is a new, valid use (JTI recorded).
+            True if this is a replay (JTI already exists and outside grace period).
+            False if this is a new use or within the grace period.
 
-        [Security Requirement] Uses atomic SET with NX (Not eXists) and EX (Expiration)
-        to prevent race conditions in high-concurrency scenarios.
+        [Security Logic] 
+        - Stores the timestamp of first use as the value in Redis.
+        - Uses SET with NX (Not eXists) and GET to atomically handle parallel requests.
+        - If the JTI exists, we allow it if the current time is within 
+          `grace_period` seconds of the first use.
         """
         now = int(time.time())
         ttl = max(1, (expires_at - now) + self._buffer)
-
         key = f"{self._prefix}{jti}"
         
-        # [Atomic] Set key only if it does not exist (NX) with a TTL (EX)
-        # Returns True if set (new token), None/False if already exists (replay)
-        success = await self._redis.set(name=key, value="1", ex=ttl, nx=True)
+        # [Atomic] Set key with timestamp only if it does not exist (NX)
+        # We use 'get=True' to retrieve the old value if it exists.
+        # This requires Redis 6.2+
+        old_value = await self._redis.set(name=key, value=str(now), ex=ttl, nx=True, get=True)
         
-        if success:
+        if old_value is None:
+            # Key didn't exist, successfully recorded first use
             logger.debug("jti_recorded", jti=jti, ttl=ttl)
             return False
         
+        # Key existed, check the grace period
+        try:
+            first_use = int(old_value)
+            elapsed = now - first_use
+            
+            if elapsed <= self._grace_period:
+                logger.debug("jti_parallel_request_allowed", jti=jti, elapsed=elapsed)
+                return False
+        except (ValueError, TypeError):
+            # Fallback if value is malformed
+            pass
+
         logger.warning("jti_replay_detected", jti=jti)
         return True
 

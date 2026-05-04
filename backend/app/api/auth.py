@@ -26,8 +26,8 @@ from jose import jwt
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.middleware.rate_limiter import limiter
-from app.schemas.token import RefreshTokenRequest, TokenRequest, TokenResponse
-from app.security.jwt_validator import JWTValidator, get_jwt_validator
+from app.schemas.token import RefreshTokenRequest, LoginRequest, TokenResponse, TokenClaims
+from app.security.jwt_validator import JWTValidator, get_jwt_validator, get_current_claims
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.engine import get_db_session
@@ -121,7 +121,7 @@ If successful, it returns a pair of tokens:
 @limiter.limit("10/minute")
 async def issue_token(
     request: Request,
-    body: TokenRequest,
+    body: LoginRequest,
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TokenResponse:
@@ -232,3 +232,19 @@ async def refresh_token(
         expires_in=settings.jwt_access_token_expire_minutes * 60,
         refresh_token=new_refresh,
     )
+
+
+@router.get(
+    "/me",
+    response_model=dict,
+    summary="Get current user info",
+    description="Validate the current access token and return basic user information.",
+)
+async def get_me(
+    claims: Annotated[TokenClaims, Depends(get_current_claims)],
+) -> dict:
+    """Return identity and roles for the currently authenticated client."""
+    return {
+        "id": claims.sub,
+        "roles": claims.roles,
+    }

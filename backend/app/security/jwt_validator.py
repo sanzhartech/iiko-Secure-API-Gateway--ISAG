@@ -43,7 +43,7 @@ from app.schemas.token import TokenClaims
 
 logger = get_logger(__name__)
 
-_bearer_scheme = HTTPBearer(auto_error=True)
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 
 class JWTValidator:
@@ -205,7 +205,7 @@ def get_jwt_validator(
 
 async def get_current_claims(
     request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer_scheme)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)],
     validator: Annotated[JWTValidator, Depends(get_jwt_validator)],
 ) -> TokenClaims:
     """
@@ -224,6 +224,13 @@ async def get_current_claims(
             claims: Annotated[TokenClaims, Depends(get_current_claims)]
         ): ...
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     claims = await validator.validate(credentials.credentials)
 
     # [Fix 2] Set verified user_id BEFORE route handler body executes.

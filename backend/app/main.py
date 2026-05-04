@@ -34,8 +34,9 @@ from app.core.hashing import get_password_hash
 logger = get_logger(__name__)
 
 async def seed_demo_client(settings: Settings) -> None:
-    """Seed the database with the default demo client from config."""
+    """Seed the database with default clients from config."""
     async with AsyncSessionLocal() as session:
+        # 1. Seed Demo Client
         client = await get_client_by_id(session, "demo-client")
         if not client:
             demo_client = GatewayClient(
@@ -44,13 +45,23 @@ async def seed_demo_client(settings: Settings) -> None:
                 roles=["operator"]
             )
             session.add(demo_client)
-            try:
-                await session.commit()
-                logger.info("seeded_demo_client", client_id="demo-client")
-            except Exception:
-                # Handle race condition where another worker already committed
-                await session.rollback()
-                logger.debug("demo_client_already_seeded")
+        
+        # 2. Seed Admin Client from env (if provided)
+        admin_client = await get_client_by_id(session, settings.admin_username)
+        if not admin_client:
+            new_admin = GatewayClient(
+                client_id=settings.admin_username,
+                hashed_secret=get_password_hash(settings.admin_password),
+                roles=["admin"]
+            )
+            session.add(new_admin)
+
+        try:
+            await session.commit()
+            logger.info("seeded_default_clients", admin_id=settings.admin_username)
+        except Exception:
+            await session.rollback()
+            logger.debug("default_clients_already_seeded")
 
 
 def _make_lifespan(settings: Settings):
@@ -185,12 +196,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     # CORS Stage
+    # Add common development ports and explicit origins from settings
+    cors_origins = settings.cors_origins_list
+    if "http://localhost:3000" not in cors_origins:
+        cors_origins.append("http://localhost:3000")
+    if "http://localhost:3001" not in cors_origins:
+        cors_origins.append("http://localhost:3001")
+    if "http://localhost" not in cors_origins:
+        cors_origins.append("http://localhost")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
+        allow_origins=cors_origins,
         allow_credentials=settings.cors_allow_credentials,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Accept", "Origin"],
         expose_headers=["X-Request-ID"],
     )
 

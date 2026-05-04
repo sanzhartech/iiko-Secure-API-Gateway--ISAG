@@ -69,6 +69,9 @@ Log in using the default credentials specified in your `docker-compose.yml`.
 
 ---
 
+## 📑 Documentation
+For a deep dive into the system's architecture, mathematical justifications, and monitoring setup, see the [Technical Documentation](technical_documentation.md).
+
 ## 🛠️ Demo & Defense Presentation
 
 To demonstrate the gateway's real-time defensive capabilities during a presentation, run the provided `demo_attack.py` script:
@@ -88,4 +91,4 @@ Watch the Admin Dashboard react to these events in real-time!
 
 ---
 **Author**: Karzhaubayev Sanzhar  
-**Status**: Production-Ready / Diploma Defense Candidate
+**Status**: 100% Completed / Hardened / Documented

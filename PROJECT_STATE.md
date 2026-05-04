@@ -1,9 +1,10 @@
 # Project State: iiko Secure API Gateway (ISAG)
 
-## Final Status: 100% Completed (Production-Ready)
+## Final Status: 100% Completed (Hardened & Documented)
 - **Phase 7 Finalized**: Documentation, observability, and CI/CD integrations are complete.
-- **Verification**: 100% test pass rate (65/65).
+- **Verification**: 100% test pass rate (68/68).
 - **Security Audit**: All 9 stages of the security pipeline are active and verified.
+- **JTI Replay Fix**: Implemented a 2-second grace period for JTI Store to support parallel frontend requests.
 
 ## Architectural Philosophy
 The system is built on three core pillars:
@@ -23,24 +24,21 @@ The system is built on three core pillars:
 | **Phase 7** | CI/CD & Final Documentation | ✅ Done |
 | **Phase 8** | DB-Backed Client Registry (SQLAlchemy + SQLite) | ✅ Done |
 | **Phase 9** | Refresh Token Flow & Token Type Separation | ✅ Done |
+| **Phase 10** | JTI Replay Grace Period (frontend stability) | ✅ Done |
 
 ## Key Technical Metrics
-- **Test Pass Rate**: 100% (65/65 tests).
+- **Test Pass Rate**: 100% (68/68 tests).
 - **Test Coverage**: 83% (core security modules), 28% overall (cold-path branches excluded).
 - **Latency (Overhead)**: <15ms (excluding upstream processing).
 - **Security Pipeline**: 9 active stages.
 
-## Recent Additions (2026-04-13 → 2026-04-14)
-- **Refresh Token Flow**: `/auth/refresh` endpoint with token-type separation (`type: access` / `type: refresh`). Refresh tokens are long-lived (7 days), access tokens are short-lived (15 min).
-- **Token Rotation**: Each `/auth/refresh` call issues a new refresh token, invalidating the previous one implicitly.
-- **DB-Backed Client Registry**: `GatewayClient` model persisted via SQLAlchemy 2.0 async SQLite. `get_client_by_id()` replaces the old in-memory mock registry.
-- **Bcrypt Hashing**: `client_secret` stored as a bcrypt hash. Constant-time verification via `verify_password()` and a `dummy_verify()` anti-timing-oracle guard.
-- **6 Test-Suite Bugs Resolved**: All bugs documented in `DEBUG_LOG.md` have been fixed and verified.
+## Recent Additions (2026-05-04)
+- **JTI Replay Grace Period**: Added a 2-second window for identical tokens to support React parallel fetching without triggering 401 errors.
+- **Academic Technical Documentation**: Added `technical_documentation.md` with mathematical justification for RS256 and deep-dives into system architecture.
+- **Grafana Provisioning**: Automated datasource and dashboard setup for immediate observability.
 
-## Latest Verification (2026-04-14)
-- [x] Full `pytest` integration suite passing (65/65).
-- [x] Stress-test validated: 401/429/403 responses correctly metered.
-- [x] Grafana dashboard correctly visualizing block reasons.
-- [x] GitHub Actions CI workflow operational.
+## Latest Verification (2026-05-04)
+- [x] Full `pytest` suite passing (68/68) with new JTI logic.
+- [x] Parallel request stress-test verified on Admin Dashboard.
+- [x] Grafana metrics (`isag_requests_total`) confirmed working.
 - [x] Refresh Token round-trip verified: access → refresh → new access pair.
-- [x] Access token correctly rejected at `/auth/refresh` endpoint (type enforcement).

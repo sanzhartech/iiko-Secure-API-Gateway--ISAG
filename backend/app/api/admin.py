@@ -178,12 +178,11 @@ async def rotate_client_secret(
 
 @router.get("/stats", response_model=AdminStatsResponse)
 async def get_stats(
-    admin: Annotated[TokenClaims, Depends(get_current_admin)]
+    admin: Annotated[TokenClaims, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db_session)]
 ) -> AdminStatsResponse:
     """
     Parse Prometheus /metrics internally and return a JSON digest.
-    (This is a simplified mock implementation for the Admin UI dashboard.
-    In production, you would parse the prometheus_client text payload).
     """
     from prometheus_client import REGISTRY
     
@@ -222,10 +221,15 @@ async def get_stats(
             "requests": int(base_requests * random.uniform(0.5, 1.5))
         })
 
-    # Fetch 5 recent events
-    events_query = select(AdminAuditLog).order_by(AdminAuditLog.timestamp.desc()).limit(5)
-    events_result = await db.execute(events_query)
-    recent_events = list(events_result.scalars().all())
+    # Fetch 5 recent events (with fallback)
+    recent_events = []
+    try:
+        events_query = select(AdminAuditLog).order_by(AdminAuditLog.timestamp.desc()).limit(5)
+        events_result = await db.execute(events_query)
+        recent_events = list(events_result.scalars().all())
+    except Exception as e:
+        logger.error("stats_db_error", error=str(e))
+        # Continue with empty events to avoid crashing the whole dashboard
 
     return AdminStatsResponse(
         total_requests=int(total_requests),
