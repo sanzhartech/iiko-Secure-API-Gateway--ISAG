@@ -7,6 +7,9 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ClientsPage from './pages/ClientsPage';
 import AuditLogs from './pages/AuditLogs';
+import IntegrationRegistry from './pages/IntegrationRegistry';
+import SecurityRules from './pages/SecurityRules';
+import Alerting from './pages/Alerting';
 
 const App: React.FC = () => {
   return (
@@ -28,7 +31,10 @@ const App: React.FC = () => {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="clients" element={<ClientsPage />} />
+            <Route path="integrations" element={<IntegrationRegistry />} />
+            <Route path="security-rules" element={<SecurityRules />} />
             <Route path="logs" element={<AuditLogs />} />
+            <Route path="alerting" element={<Alerting />} />
           </Route>
 
           {/* Fallback */}
