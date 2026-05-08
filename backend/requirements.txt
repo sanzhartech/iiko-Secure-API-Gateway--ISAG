@@ -18,7 +18,7 @@ limits==3.12.0
 httpx==0.27.0
 
 # ─── Structured Logging ───────────────────────────────────────────────────────
-structlog==24.1.0
+structlog==25.5.0
 
 # ─── CORS / Security Headers ──────────────────────────────────────────────────
 starlette==0.37.2
