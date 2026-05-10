@@ -99,6 +99,24 @@ async def _forward(
         raise
 
 
+from fastapi import BackgroundTasks
+from datetime import datetime, timezone
+from sqlalchemy import update
+from app.db.engine import AsyncSessionLocal
+from app.models.client import GatewayClient
+
+async def _update_last_used_at(client_id: str):
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                update(GatewayClient)
+                .where(GatewayClient.client_id == client_id)
+                .values(last_used_at=datetime.now(timezone.utc))
+            )
+            await session.commit()
+    except Exception as e:
+        logger.error("last_used_at_update_failed", error=str(e))
+
 @router.api_route(
     "/{path:path}",
     methods=["GET"],
@@ -115,6 +133,7 @@ Securely forwards a GET request to the iiko upstream API.
 async def proxy_read(
     path: str,
     request: Request,
+    background_tasks: BackgroundTasks,
     claims: Annotated[
         TokenClaims,
         Depends(require_permissions(Permission.PROXY_READ)),
@@ -128,6 +147,7 @@ async def proxy_read(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="System is under global lockdown."
         )
+    background_tasks.add_task(_update_last_used_at, claims.sub)
     return await _forward(request, path, claims, iiko_client)
 
 
@@ -147,6 +167,7 @@ Securely forwards a state-changing request (POST/PUT/PATCH/DELETE) to the iiko u
 async def proxy_write(
     path: str,
     request: Request,
+    background_tasks: BackgroundTasks,
     claims: Annotated[
         TokenClaims,
         Depends(require_permissions(Permission.PROXY_WRITE)),
@@ -160,4 +181,5 @@ async def proxy_write(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="System is under global lockdown."
         )
+    background_tasks.add_task(_update_last_used_at, claims.sub)
     return await _forward(request, path, claims, iiko_client)

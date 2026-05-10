@@ -19,6 +19,7 @@ class ClientResponse(BaseModel):
     scopes: list[str]
     rate_limit: int
     is_active: bool
+    last_used_at: datetime | None = None
 
 class ClientCreateRequest(BaseModel):
     client_id: str = Field(..., max_length=128)

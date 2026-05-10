@@ -43,15 +43,7 @@ async def seed_demo_client(settings: Settings) -> None:
     account, following the fail-secure / least-privilege principles.
     """
     async with AsyncSessionLocal() as session:
-        # 1. Seed Demo Client
-        client = await get_client_by_id(session, "demo-client")
-        if not client:
-            demo_client = GatewayClient(
-                client_id="demo-client",
-                hashed_secret=get_password_hash(settings.gateway_client_secret),
-                roles=["operator"]
-            )
-            session.add(demo_client)
+        # 1. (Removed Demo Client for Security)
 
         # 2. [Sec-1] Seed Admin Client ONLY when credentials are explicitly provided.
         # Never fall back to default admin/admin — fail-secure design.

@@ -285,44 +285,26 @@ async def get_stats(
     avg_latency = (row.avg_lat / 1000.0) if row and row.avg_lat else 0.0
     error_rate = (blocked_requests / total_requests) if total_requests > 0 else 0.0
 
-    # Fetch real time-series data from GatewayRequestLog for the last 6 hours
-    now = datetime.datetime.now(datetime.timezone.utc)
-    six_hours_ago = now - datetime.timedelta(hours=6)
-    
+    # Fetch request volumes grouped by Partner Name (client_id)
     time_series = []
     
     try:
-        # Group by hour and count requests
+        # Group by client_id and count requests
         query = select(
-            func.strftime('%H:00', GatewayRequestLog.timestamp).label("hour"),
+            GatewayRequestLog.client_id.label("partner"),
             func.count().label("requests")
-        ).where(
-            GatewayRequestLog.timestamp >= six_hours_ago
-        ).group_by("hour").order_by("hour")
+        ).group_by("partner").order_by(func.count().desc()).limit(10)
         
         result = await db.execute(query)
         rows = result.fetchall()
         
-        # Build dictionary for existing data
-        db_data = {row.hour: row.requests for row in rows}
-        
-        # Ensure we have exactly 6 hours of data in order
-        for i in range(5, -1, -1):
-            dt = now - datetime.timedelta(hours=i)
-            hour_str = dt.strftime("%H:00")
+        for row in rows:
             time_series.append({
-                "time": hour_str,
-                "requests": db_data.get(hour_str, 0)
+                "time": row.partner,  # repurposing 'time' field for partner name
+                "requests": row.requests
             })
     except Exception as e:
-        logger.error("stats_timeseries_db_error", error=str(e))
-        # Fallback to zero if db fails
-        for i in range(5, -1, -1):
-            dt = now - datetime.timedelta(hours=i)
-            time_series.append({
-                "time": dt.strftime("%H:00"),
-                "requests": 0
-            })
+        logger.error("stats_partner_db_error", error=str(e))
 
     # Fetch 5 recent events (with fallback)
     recent_events = []

@@ -1,7 +1,7 @@
 import React from 'react';
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 
 interface TimeSeriesDataPoint {
-  time: string;
+  time: string; // Used for partner name now
   requests: number;
 }
 
@@ -22,17 +22,11 @@ export const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
   return (
     <div className="glass-card" style={{ height: '350px', width: '100%', padding: '24px' }}>
       <h3 style={{ marginBottom: '24px', color: 'var(--text-secondary)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        Request Volume (Last 6 Hours)
+        Request Volume by Partner
       </h3>
       <div style={{ height: '260px' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--accent-cyan)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--accent-cyan)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <XAxis 
               dataKey="time" 
               stroke="var(--text-secondary)" 
@@ -48,6 +42,7 @@ export const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             />
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
             <Tooltip 
+              cursor={{ fill: 'rgba(255,255,255,0.05)' }}
               contentStyle={{ 
                 backgroundColor: 'var(--bg-primary)', 
                 border: '1px solid rgba(255,255,255,0.1)',
@@ -55,15 +50,12 @@ export const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
                 color: 'var(--text-primary)'
               }} 
             />
-            <Area 
-              type="monotone" 
+            <Bar 
               dataKey="requests" 
-              stroke="var(--accent-cyan)" 
-              strokeWidth={2}
-              fillOpacity={1} 
-              fill="url(#colorRequests)" 
+              fill="var(--accent-cyan)" 
+              radius={[4, 4, 0, 0]} 
             />
-          </AreaChart>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>

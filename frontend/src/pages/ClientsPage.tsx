@@ -11,6 +11,7 @@ interface Client {
   scopes: string[];
   rate_limit: number;
   is_active: boolean;
+  last_used_at?: string;
 }
 
 const MOCK_CLIENTS: Client[] = [
@@ -32,7 +33,7 @@ export const ClientsPage: React.FC = () => {
   const [confirmRevoke, setConfirmRevoke] = useState<{ id: string; currentStatus: boolean } | null>(null);
   const [confirmRotate, setConfirmRotate] = useState<string | null>(null);
   const [editingRateLimit, setEditingRateLimit] = useState<Client | null>(null);
-  const [preset, setPreset] = useState<'custom' | 'yandex'>('custom');
+  const [preset, setPreset] = useState<'custom' | 'delivery' | 'loyalty'>('custom');
 
   const fetchClients = async () => {
     try {
@@ -162,6 +163,7 @@ export const ClientsPage: React.FC = () => {
               <th>Scopes</th>
               <th>Rate Limit</th>
               <th>Status</th>
+              <th>Last Seen</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -204,10 +206,15 @@ export const ClientsPage: React.FC = () => {
                 </td>
                 <td>
                   {client.is_active ? (
-                    <span className="badge active"><Check size={12} /> Active</span>
+                    <span className="badge active"><Check size={12} /> Active/Secure</span>
                   ) : (
-                    <span className="badge revoked"><ShieldAlert size={12} /> Revoked</span>
+                    <span className="badge revoked"><ShieldAlert size={12} /> Suspended</span>
                   )}
+                </td>
+                <td>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {client.last_used_at ? new Date(client.last_used_at).toLocaleString() : 'Never'}
+                  </span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -271,11 +278,12 @@ export const ClientsPage: React.FC = () => {
               <select 
                 className="glass-input" 
                 value={preset} 
-                onChange={(e) => setPreset(e.target.value as 'custom' | 'yandex')}
+                onChange={(e) => setPreset(e.target.value as 'custom' | 'delivery' | 'loyalty')}
                 style={{ width: '100%', appearance: 'auto', background: 'var(--bg-glass)' }}
               >
                 <option value="custom">Custom Configuration</option>
-                <option value="yandex">Yandex Delivery</option>
+                <option value="delivery">Delivery Aggregator (Yandex/Wolt)</option>
+                <option value="loyalty">Loyalty/Mobile App</option>
               </select>
             </div>
 
@@ -288,26 +296,26 @@ export const ClientsPage: React.FC = () => {
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Roles (comma separated)</label>
                 <input name="roles" className="glass-input" placeholder="e.g., delivery_app" 
-                       defaultValue={preset === 'yandex' ? 'delivery_app' : ''} 
-                       readOnly={preset === 'yandex'}
-                       style={{ opacity: preset === 'yandex' ? 0.7 : 1 }} />
+                       defaultValue={preset === 'delivery' ? 'delivery_app' : preset === 'loyalty' ? 'loyalty_partner' : ''} 
+                       readOnly={preset !== 'custom'}
+                       style={{ opacity: preset !== 'custom' ? 0.7 : 1 }} />
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Scopes (comma separated)</label>
                 <input name="scopes" className="glass-input" placeholder="e.g., orders:write, menu:read" 
-                       defaultValue={preset === 'yandex' ? 'orders:write, menu:read' : ''} 
-                       readOnly={preset === 'yandex'}
-                       style={{ opacity: preset === 'yandex' ? 0.7 : 1 }} />
+                       defaultValue={preset === 'delivery' ? 'orders:write, menu:read, stop_lists:read' : preset === 'loyalty' ? 'customer:info, marketing:read' : ''} 
+                       readOnly={preset !== 'custom'}
+                       style={{ opacity: preset !== 'custom' ? 0.7 : 1 }} />
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Rate Limit (req/min)</label>
                 <input name="rateLimit" type="number" className="glass-input" 
-                       defaultValue={preset === 'yandex' ? 100 : 10} 
+                       defaultValue={preset === 'delivery' ? 100 : preset === 'loyalty' ? 50 : 10} 
                        min={1} required 
-                       readOnly={preset === 'yandex'}
-                       style={{ opacity: preset === 'yandex' ? 0.7 : 1 }} />
+                       readOnly={preset !== 'custom'}
+                       style={{ opacity: preset !== 'custom' ? 0.7 : 1 }} />
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>

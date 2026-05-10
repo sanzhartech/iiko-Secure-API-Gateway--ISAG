@@ -1,4 +1,7 @@
-FROM python:3.12-slim
+FROM python:3.12.3-slim-bookworm
+
+# Create a non-root user and group
+RUN groupadd -r isaguser && useradd -r -g isaguser isaguser
 
 WORKDIR /app
 
@@ -13,8 +16,11 @@ COPY requirements.txt .
 RUN echo "asyncpg==0.29.0" >> requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy application code and set ownership
+COPY --chown=isaguser:isaguser . .
+
+# Switch to non-root user
+USER isaguser
 
 # Expose port
 EXPOSE 8000

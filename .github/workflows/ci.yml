@@ -85,6 +85,15 @@ jobs:
           REDIS_URL=redis://localhost:6379/1
           EOF
 
+      - name: Run SAST Security Scans
+        working-directory: backend
+        run: |
+          pip install bandit pip-audit
+          # Scan dependencies for known vulnerabilities
+          pip-audit -r requirements.txt
+          # Scan codebase for security issues
+          bandit -r app/ -ll -ii
+
       - name: Run test suite with coverage
         working-directory: backend
         env:
