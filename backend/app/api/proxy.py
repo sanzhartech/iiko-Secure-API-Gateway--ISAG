@@ -12,6 +12,7 @@ from app.core.logging import get_logger
 from app.middleware.rate_limiter import limiter
 from app.schemas.token import TokenClaims
 from app.security.rbac import Permission, require_permissions
+from app.security.scope import ensure_scope_access
 from app.services.iiko_client import IikoClient, _STRIP_RESPONSE_HEADERS
 
 router = APIRouter(prefix="/api", tags=["iiko Proxy"])
@@ -118,6 +119,7 @@ async def proxy_read(
     ],
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
 ) -> Response:
+    ensure_scope_access(claims, request.method, path)
     return await _forward(request, path, claims, iiko_client)
 
 
@@ -143,4 +145,5 @@ async def proxy_write(
     ],
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
 ) -> Response:
+    ensure_scope_access(claims, request.method, path)
     return await _forward(request, path, claims, iiko_client)

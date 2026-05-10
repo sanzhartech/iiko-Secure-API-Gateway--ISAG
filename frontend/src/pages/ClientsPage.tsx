@@ -13,17 +13,10 @@ interface Client {
   is_active: boolean;
 }
 
-const MOCK_CLIENTS: Client[] = [
-  { id: '1', client_id: 'iiko-delivery-v3', roles: ['delivery_app'], scopes: ['orders:write', 'menu:read'], rate_limit: 100, is_active: true },
-  { id: '2', client_id: 'loyalty-partner-ext', roles: ['loyalty_partner'], scopes: ['customers:read'], rate_limit: 50, is_active: true },
-  { id: '3', client_id: 'pos-terminal-77', roles: ['operator'], scopes: ['terminal:write'], rate_limit: 10, is_active: false },
-  { id: '4', client_id: 'marketing-analytics', roles: ['admin'], scopes: ['reports:read'], rate_limit: 200, is_active: true },
-];
-
 export const ClientsPage: React.FC = () => {
-  const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
+  const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
 
   // Modals state
@@ -36,11 +29,9 @@ export const ClientsPage: React.FC = () => {
   const fetchClients = async () => {
     try {
       const res = await apiClient.get<Client[]>('/admin/clients');
-      if (res.data.length > 0) {
-        setClients(res.data);
-      }
+      setClients(res.data);
     } catch (_err: unknown) {
-      console.warn('Using mock clients due to backend unavailability');
+      showToast('Unable to load clients', 'error');
     } finally {
       setLoading(false);
     }
@@ -57,10 +48,7 @@ export const ClientsPage: React.FC = () => {
       setConfirmRevoke(null);
       fetchClients();
     } catch (_err: unknown) {
-      // Mock update
-      setClients(prev => prev.map(c => c.id === id ? { ...c, is_active: !currentStatus } : c));
-      showToast(`[MOCK] Client status updated`, 'success');
-      setConfirmRevoke(null);
+      showToast('Unable to update client status', 'error');
     }
   };
 
@@ -68,15 +56,12 @@ export const ClientsPage: React.FC = () => {
     e.preventDefault();
     if (!editingRateLimit) return;
     try {
-      // Assuming endpoint exists or we mock it
       await apiClient.patch(`/admin/clients/${editingRateLimit.id}`, { rate_limit: editingRateLimit.rate_limit });
       showToast('Rate limit updated', 'success');
       setEditingRateLimit(null);
       fetchClients();
     } catch (_err: unknown) {
-      setClients(prev => prev.map(c => c.id === editingRateLimit.id ? editingRateLimit : c));
-      showToast('[MOCK] Rate limit updated', 'success');
-      setEditingRateLimit(null);
+      showToast('Unable to update rate limit', 'error');
     }
   };
 
@@ -100,9 +85,7 @@ export const ClientsPage: React.FC = () => {
       fetchClients();
       showToast('Client created successfully', 'success');
     } catch (_err: unknown) {
-      showToast('Backend error, mock created', 'success');
-      setNewClientSecret({ id: clientId, secret: 'isag_sk_live_mock_' + Math.random().toString(36).substring(7) });
-      setShowCreateModal(false);
+      showToast('Unable to create client', 'error');
     }
   };
 
@@ -113,9 +96,7 @@ export const ClientsPage: React.FC = () => {
       setConfirmRotate(null);
       showToast('Client secret rotated successfully', 'success');
     } catch (_err: unknown) {
-      setNewClientSecret({ id, secret: 'isag_sk_rotated_mock_' + Math.random().toString(36).substring(7) });
-      setConfirmRotate(null);
-      showToast('[MOCK] Secret rotated', 'success');
+      showToast('Unable to rotate secret', 'error');
     }
   };
 
