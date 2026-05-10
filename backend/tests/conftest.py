@@ -12,6 +12,7 @@ import os
 os.environ["TESTING"] = "1"
 
 import time
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -101,6 +102,7 @@ def make_token(rsa_private_key_pem):
     def _make(
         sub: str = "test-user",
         roles: list[str] | None = None,
+        scopes: list[str] | None = None,
         token_type: str = "access",
         iss: str = "isag.internal",
         aud: str = "isag-clients",
@@ -118,6 +120,7 @@ def make_token(rsa_private_key_pem):
             "type": token_type,
             "sub": sub,
             "roles": roles if roles is not None else ["operator"],
+            "scopes": scopes if scopes is not None else ["*"],
             "iss": iss,
             "aud": aud,
             "exp": now + exp_offset,
@@ -155,7 +158,8 @@ def test_settings(tmp_path_factory, rsa_private_key_pem, rsa_public_key_pem, rsa
     import os
     import json
     
-    tmp_dir = tmp_path_factory.mktemp("keys")
+    tmp_dir = Path.cwd() / ".pytest_tmp" / "keys"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
     private_key_path = tmp_dir / "private.pem"
     private_key_path.write_text(rsa_private_key_pem, encoding="utf-8")
     

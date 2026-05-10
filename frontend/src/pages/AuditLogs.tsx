@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, ShieldAlert, Settings, Terminal, Clock, Download, ExternalLink, Filter, Search, User } from 'lucide-react';
+import { Activity, ShieldAlert, Settings, Terminal, Download, ExternalLink, Filter, Search, User } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import { useToast } from '../components/Toast/ToastContext';
 import '../styles/theme.css';
@@ -19,54 +19,9 @@ interface AuditLog {
   };
 }
 
-const MOCK_LOGS: AuditLog[] = [
-  {
-    id: '1',
-    timestamp: new Date().toISOString(),
-    admin_id: 'SYSTEM',
-    action: 'SECURITY_BLOCK',
-    target_id: '192.168.1.104',
-    ip_address: '192.168.1.104',
-    details: {
-      correlation_id: 'isag-req-8842-xa9',
-      request_payload: { method: 'POST', path: '/v1/orders', body: { items: [], total: 0 }, note: 'Possible SQLi attempt in User-Agent' },
-      headers: { 'User-Agent': "' OR 1=1 --", 'X-Forwarded-For': '192.168.1.104' },
-      response_payload: { error: 'Security violation', message: 'Malicious payload detected' }
-    }
-  },
-  {
-    id: '2',
-    timestamp: new Date(Date.now() - 50000).toISOString(),
-    admin_id: 'sanzhar',
-    action: 'CLIENT_SECRET_ROTATE',
-    target_id: 'delivery-app-prod',
-    ip_address: '127.0.0.1',
-    details: {
-      correlation_id: 'isag-adm-1102-bc3',
-      request_payload: { action: 'ROTATE_SECRET', client_id: 'delivery-app-prod' },
-      headers: { 'Authorization': 'Bearer [MASKED]' },
-      response_payload: { status: 'success', new_kid: 'isag_kid_992' }
-    }
-  },
-  {
-    id: '3',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    admin_id: 'iiko-sync-worker',
-    action: 'UPSTREAM_LATENCY_WARN',
-    target_id: 'IIKO_API_MAIN',
-    ip_address: '10.0.1.5',
-    details: {
-      correlation_id: 'isag-sys-5521-jk8',
-      request_payload: { endpoint: '/api/v1/nomenclature', latency: '2450ms' },
-      headers: { 'X-Correlation-ID': 'isag-sys-5521-jk8' },
-      response_payload: { warning: 'Latency threshold exceeded (2000ms)' }
-    }
-  }
-];
-
 export const AuditLogs: React.FC = () => {
-  const [logs, setLogs] = useState<AuditLog[]>(MOCK_LOGS);
-  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [search, setSearch] = useState('');
   const { showToast } = useToast();
@@ -75,11 +30,9 @@ export const AuditLogs: React.FC = () => {
     const fetchLogs = async () => {
       try {
         const res = await apiClient.get<AuditLog[]>('/admin/logs?limit=100');
-        if (res.data.length > 0) {
-          setLogs(res.data);
-        }
+        setLogs(res.data);
       } catch (_err: unknown) {
-        console.warn('Backend unavailable, showing audit history');
+        showToast('Unable to load audit logs', 'error');
       } finally {
         setLoading(false);
       }
