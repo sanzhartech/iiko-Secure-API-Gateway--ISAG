@@ -5,6 +5,7 @@ addopts = "-v --tb=short --cov=app --cov-report=term-missing"
 
 [tool.coverage.run]
 omit = ["tests/*", "app/main.py"]
+data_file = ".pytest_cache/.coverage"
 
 [tool.ruff]
 line-length = 88
