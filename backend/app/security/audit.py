@@ -31,6 +31,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from app.core.logging import get_logger
+from app.core.network import compile_trusted_networks, extract_client_ip
 
 logger = get_logger(__name__)
 
@@ -48,23 +49,12 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: ASGIApp, trusted_cidrs: list[str] | None = None) -> None:
         super().__init__(app)
-        # Parse CIDR strings once at startup
-        self._trusted_networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
-        for cidr in (trusted_cidrs or []):
+        self._trusted_networks = compile_trusted_networks(trusted_cidrs or [])
+        for cidr in trusted_cidrs or []:
             try:
-                self._trusted_networks.append(ipaddress.ip_network(cidr, strict=False))
+                ipaddress.ip_network(cidr, strict=False)
             except ValueError:
                 logger.warning("trusted_cidr_invalid", cidr=cidr)
-
-    def _is_trusted_proxy(self, host: str) -> bool:
-        """Return True if host is within a trusted proxy CIDR range."""
-        if not self._trusted_networks:
-            return False
-        try:
-            addr = ipaddress.ip_address(host)
-            return any(addr in net for net in self._trusted_networks)
-        except ValueError:
-            return False
 
     def _get_client_ip(self, request: Request) -> str:
         """
@@ -78,17 +68,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         This prevents any client from spoofing their IP by setting
         X-Forwarded-For themselves.
         """
-        direct_ip: str = (
-            request.client.host if request.client else "unknown"
-        )
-
-        if self._is_trusted_proxy(direct_ip):
-            forwarded_for = request.headers.get("x-forwarded-for", "")
-            if forwarded_for:
-                # Take leftmost (original client) IP
-                return forwarded_for.split(",")[0].strip()
-
-        return direct_ip
+        return extract_client_ip(request, self._trusted_networks)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         request_id = str(uuid.uuid4())
