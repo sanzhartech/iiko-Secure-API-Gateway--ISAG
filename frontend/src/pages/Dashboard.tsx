@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, ShieldAlert, Zap, Globe, Power, AlertTriangle, Clock } from 'lucide-react';
+import { Activity, ShieldAlert, Zap, Globe, Clock } from 'lucide-react';
 import '../styles/theme.css';
 import { apiClient } from '../services/apiClient';
 import MetricsChart from '../components/Charts/MetricsChart';
@@ -31,46 +31,22 @@ interface AdminStats {
   recent_events: AuditLog[];
 }
 
-// Realistic Mock Data for "Full" look
-const MOCK_STATS: AdminStats = {
-  total_requests: 124852,
-  error_rate: 0.0012,
-  avg_latency: 0.0452,
-  time_series: Array.from({ length: 24 }, (_, i) => ({
-    time: `${i}:00`,
-    requests: Math.floor(Math.random() * 5000) + 1000,
-    target_id: 'iiko-upstream',
-    ip_address: '10.0.0.1'
-  })),
-  recent_events: [
-    { id: '1', timestamp: new Date().toISOString(), admin_id: 'SYSTEM', action: 'IP 192.168.1.45 blocked: Brute force detected', target_id: 'AUTH_GATE', ip_address: '192.168.1.45' },
-    { id: '2', timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), admin_id: 'sanzhar', action: 'Client "delivery-app-v2" secret rotated', target_id: 'delivery-app-v2', ip_address: '127.0.0.1' },
-    { id: '3', timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), admin_id: 'SYSTEM', action: 'High latency detected on iiko Upstream (2.4s)', target_id: 'IIKO_API', ip_address: '10.0.4.12' },
-    { id: '4', timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), admin_id: 'admin', action: 'New Client created: "loyalty-partner-global"', target_id: 'loyalty-partner-global', ip_address: '127.0.0.1' },
-  ]
-};
-
 export const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<AdminStats | null>(MOCK_STATS);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [pulseActive, setPulseActive] = useState(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [isKillSwitchModalOpen, setIsKillSwitchModalOpen] = useState(false);
-  const [isLockdown, setIsLockdown] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const { showToast } = useToast();
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const res = await apiClient.get<AdminStats>('/admin/stats');
-        // Merge real data with mock if real is empty/zero
-        if (res.data.total_requests > 0) {
-          setStats(res.data);
-        }
+        setStats(res.data);
         setPulseActive(false);
         setTimeout(() => setPulseActive(true), 50);
       } catch (err: any) {
         if (err.response?.status !== 401) {
-          console.warn('Backend unavailable, showing demo data');
+          showToast('Unable to load gateway statistics', 'error');
         }
       } finally {
         setLoading(false);
@@ -81,13 +57,6 @@ export const Dashboard: React.FC = () => {
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
   }, [showToast]);
-
-  const handleKillSwitch = () => {
-    setIsLockdown(true);
-    setIsKillSwitchModalOpen(false);
-    showToast('SYSTEM LOCKDOWN ACTIVATED. ALL TRAFFIC BLOCKED.', 'error');
-    console.log('KILL SWITCH ENGAGED');
-  };
 
   return (
     <div style={{ padding: '32px' }}>
@@ -101,14 +70,9 @@ export const Dashboard: React.FC = () => {
           </span>
         </div>
 
-        <button 
-          className="kill-switch" 
-          onClick={() => setIsKillSwitchModalOpen(true)}
-          style={{ background: isLockdown ? 'var(--accent-crimson)' : '' }}
-        >
-          <Power size={18} />
-          {isLockdown ? 'Lockdown Active' : 'Kill Switch'}
-        </button>
+        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          Operational mode: live telemetry only
+        </span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
@@ -171,7 +135,7 @@ export const Dashboard: React.FC = () => {
               <MetricsChart data={stats.time_series} />
             ) : (
               <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-                Syncing with blockchain telemetry...
+                {loading ? 'Loading telemetry...' : 'No historical telemetry available yet'}
               </div>
             )}
           </div>
@@ -185,26 +149,6 @@ export const Dashboard: React.FC = () => {
           <LiveEvents events={stats?.recent_events || []} />
         </div>
       </div>
-
-      {/* Kill Switch Confirmation Modal */}
-      {isKillSwitchModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card" style={{ borderColor: 'var(--accent-crimson)', maxWidth: '450px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', color: 'var(--accent-crimson)' }}>
-              <AlertTriangle size={32} />
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>EMERGENCY LOCKDOWN</h2>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
-              Activating the <strong>Kill Switch</strong> will immediately terminate all external proxying to iiko API. 
-              Only administrative access will remain active. This action is logged and will trigger high-priority alerts.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button className="btn-revoke" style={{ color: 'var(--text-primary)', borderColor: 'rgba(255,255,255,0.2)' }} onClick={() => setIsKillSwitchModalOpen(false)}>Cancel</button>
-              <button className="kill-switch" onClick={handleKillSwitch}>Engage Lockdown</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

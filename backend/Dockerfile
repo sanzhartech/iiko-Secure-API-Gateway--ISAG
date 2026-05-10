@@ -9,8 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY requirements.txt .
-# Add asyncpg for PostgreSQL support requested in Docker compose
-RUN echo "asyncpg==0.29.0" >> requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
