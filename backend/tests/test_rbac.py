@@ -68,14 +68,14 @@ class TestRBACHTTP:
 
     async def test_operator_can_get(self, async_client, make_token, test_settings):
         """operator role has PROXY_READ → GET /api/... allowed."""
-        client, mock_iiko, _ = async_client
+        client, mock_iiko, mock_redis = async_client
+        mock_redis.get.return_value = None
         token = make_token(roles=["operator"])
         from contextlib import asynccontextmanager
         @asynccontextmanager
         async def _mock_cm(*args, **kwargs):
             yield httpx.Response(200, json={"data": []})
-        from unittest.mock import MagicMock
-        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+        mock_iiko.proxy_request_stream = _mock_cm
 
         response = await client.get(
             "/api/orders",
@@ -123,14 +123,14 @@ class TestRBACHTTP:
 
     async def test_admin_can_get_and_post(self, async_client, make_token, test_settings):
         """admin role has all permissions → GET and POST both allowed."""
-        client, mock_iiko, _ = async_client
+        client, mock_iiko, mock_redis = async_client
+        mock_redis.get.return_value = None
         token = make_token(roles=["admin"])
         from contextlib import asynccontextmanager
         @asynccontextmanager
         async def _mock_cm(*args, **kwargs):
             yield httpx.Response(201, json={"created": True})
-        from unittest.mock import MagicMock
-        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+        mock_iiko.proxy_request_stream = _mock_cm
 
         response = await client.post(
             "/api/orders",

@@ -55,3 +55,52 @@ async def test_admin_client_lifecycle(async_client: tuple[AsyncClient, ...], mak
     )
     assert patch_response.status_code == 200
     assert patch_response.json()["is_active"] is False
+
+@pytest.mark.asyncio
+async def test_admin_kill_switch(async_client: tuple[AsyncClient, ...], make_token):
+    client, mock_iiko, mock_redis = async_client
+    token = make_token(roles=["admin"], sub="admin_test")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Activate Kill Switch
+    mock_redis.set.return_value = True
+    response = await client.post("/admin/kill-switch", json={"active": True}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["active"] is True
+    mock_redis.set.assert_called_with("isag:global_block", "1")
+
+    # 2. Check proxy is blocked
+    mock_redis.get.return_value = "1"
+    proxy_response = await client.get("/api/orders", headers={"Authorization": f"Bearer {make_token()}"})
+    assert proxy_response.status_code == 403
+    assert "global lockdown" in proxy_response.json()["detail"].lower()
+
+    # 3. Deactivate Kill Switch
+    mock_redis.delete.return_value = 1
+    response = await client.post("/admin/kill-switch", json={"active": False}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["active"] is False
+    mock_redis.delete.assert_called_with("isag:global_block")
+
+@pytest.mark.asyncio
+async def test_admin_rate_limit_update(async_client: tuple[AsyncClient, ...], make_token):
+    client, mock_iiko, mock_redis = async_client
+    token = make_token(roles=["admin"], sub="admin_test")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create client
+    create_payload = {"client_id": "rl_test", "rate_limit": 10}
+    create_response = await client.post("/admin/clients", json=create_payload, headers=headers)
+    
+    list_response = await client.get("/admin/clients", headers=headers)
+    created_client = next((c for c in list_response.json() if c["client_id"] == "rl_test"), None)
+    client_uuid = created_client["id"]
+
+    # Update rate limit
+    response = await client.patch(
+        f"/admin/clients/{client_uuid}/rate-limit",
+        json={"rate_limit": 150},
+        headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["rate_limit"] == 150

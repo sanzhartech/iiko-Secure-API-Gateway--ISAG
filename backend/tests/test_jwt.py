@@ -27,15 +27,15 @@ class TestJWTValidation:
 
     async def test_valid_token_accepted(self, async_client, make_token, test_settings):
         """Valid RS256 token with correct claims → passes JWT validation."""
-        client, mock_iiko, _ = async_client
+        client, mock_iiko, mock_redis = async_client
+        mock_redis.get.return_value = None
         token = make_token(roles=["operator"])
 
         from contextlib import asynccontextmanager
         @asynccontextmanager
         async def _mock_cm(*args, **kwargs):
             yield httpx.Response(200, json={"ok": True})
-        from unittest.mock import MagicMock
-        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+        mock_iiko.proxy_request_stream = _mock_cm
 
         response = await client.get(
             "/api/orders",
@@ -166,7 +166,8 @@ class TestJWTKeyRotation:
         Token signed with the rotated private key and carrying kid-test-rotated
         must be accepted — the key store contains both primary and rotated keys.
         """
-        client, mock_iiko, _ = async_client
+        client, mock_iiko, mock_redis = async_client
+        mock_redis.get.return_value = None
         import httpx as _httpx
         from contextlib import asynccontextmanager
         @asynccontextmanager
@@ -214,14 +215,14 @@ class TestJWTKeyRotation:
         Token without a kid header must fall back to the first registered key
         (kid-test-2025 / primary) and be accepted.
         """
-        client, mock_iiko, _ = async_client
+        client, mock_iiko, mock_redis = async_client
+        mock_redis.get.return_value = None
         import httpx as _httpx
         from contextlib import asynccontextmanager
         @asynccontextmanager
         async def _mock_cm(*args, **kwargs):
             yield _httpx.Response(200, json={"ok": True})
-        from unittest.mock import MagicMock
-        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+        mock_iiko.proxy_request_stream = _mock_cm
 
         token = make_token(kid=None)   # no kid in JOSE header
 
@@ -266,6 +267,7 @@ class TestJWTKeyRotation:
         Stage 5 of the Security Pipeline.
         """
         client, mock_iiko, mock_redis = async_client
+        mock_redis.get.return_value = None
         token = make_token()
 
         # Mock successful proxy response
@@ -274,11 +276,10 @@ class TestJWTKeyRotation:
         async def _mock_cm(*args, **kwargs):
             import httpx as _httpx
             yield _httpx.Response(200, json={"ok": True})
-        from unittest.mock import MagicMock
-        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+        mock_iiko.proxy_request_stream = _mock_cm
 
         # First attempt: mock_redis.set returns None (NX=True successful, new token)
-        mock_redis.set.return_value = None
+        mock_redis.set.side_effect = [None]
 
         response1 = await client.get(
             "/api/orders",
@@ -290,7 +291,7 @@ class TestJWTKeyRotation:
         # We use a timestamp from 10 seconds ago to be outside the 2s grace period.
         import time
         past_timestamp = str(int(time.time()) - 10)
-        mock_redis.set.return_value = past_timestamp
+        mock_redis.set.side_effect = [past_timestamp]
 
         response2 = await client.get(
             "/api/orders",
@@ -305,6 +306,7 @@ class TestJWTKeyRotation:
         This supports React frontend's simultaneous fetching.
         """
         client, mock_iiko, mock_redis = async_client
+        mock_redis.get.return_value = None
         token = make_token()
 
         from contextlib import asynccontextmanager
@@ -312,17 +314,17 @@ class TestJWTKeyRotation:
         async def _mock_cm(*args, **kwargs):
             import httpx as _httpx
             yield _httpx.Response(200, json={"ok": True})
-        from unittest.mock import MagicMock
-        mock_iiko.proxy_request_stream = MagicMock(side_effect=_mock_cm)
+        mock_iiko.proxy_request_stream = _mock_cm
 
         # First attempt: success
-        mock_redis.set.return_value = None
+        mock_redis.set.side_effect = [None]
         await client.get("/api/orders", headers={"Authorization": f"Bearer {token}"})
 
         # Second attempt: same token but WITHIN 1 second of the first use
         import time
         current_timestamp = str(int(time.time()))
-        mock_redis.set.return_value = current_timestamp # simulate key already exists with recent TS
+        mock_redis.set.side_effect = [current_timestamp] # simulate key already exists with recent TS
+        mock_redis.incr.return_value = 1 # Allow one grace use
 
         response2 = await client.get(
             "/api/orders",

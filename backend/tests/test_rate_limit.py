@@ -5,6 +5,7 @@ tests/test_rate_limit.py — Rate Limiting Integration Tests
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -56,11 +57,10 @@ class TestRateLimitIntegration:
         token = make_token(sub=unique_sub, roles=["operator"])
 
         # Proper async context manager mock
-        mock_response = httpx.Response(200, content=b"ok")
-        mock_cm = AsyncMock()
-        mock_cm.__aenter__.return_value = mock_response
-        mock_cm.__aexit__ = AsyncMock(return_value=None)  # [Fix #8] avoid RuntimeWarning
-        mock_iiko.proxy_request_stream.return_value = mock_cm
+        @asynccontextmanager
+        async def _mock_cm(*args, **kwargs):
+            yield httpx.Response(200, content=b"ok")
+        mock_iiko.proxy_request_stream = _mock_cm
 
         # SlowAPI fixed-window default is 100/minute; the @limiter.limit("50/minute")
         # decorator on the proxy route applies first.

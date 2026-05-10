@@ -278,6 +278,11 @@ async def async_client(test_settings):
     mock_redis_service.client = mock_redis
     application.dependency_overrides[get_redis_service] = lambda: mock_redis_service
 
+    # [Sec-4] Default mocks for JTIStore (SET NX GET, INCR, EXPIRE)
+    mock_redis.set.side_effect = lambda *args, **kwargs: None # Default success
+    mock_redis.incr.return_value = 1
+    mock_redis.expire.return_value = True
+
     async with AsyncClient(
         transport=ASGITransport(app=application),
         base_url="http://test",
@@ -295,4 +300,6 @@ def reset_mocks(async_client):
     mock_iiko.reset_mock()
     mock_redis.reset_mock()
     # Ensure JTI checks pass by default (None = key created)
-    mock_redis.set.return_value = None
+    mock_redis.set.side_effect = lambda *args, **kwargs: None
+    mock_redis.incr.return_value = 1
+    mock_redis.expire.return_value = True
