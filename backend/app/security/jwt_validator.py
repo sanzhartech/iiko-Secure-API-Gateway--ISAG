@@ -180,6 +180,7 @@ class JWTValidator:
             jti=str(payload["jti"]),
             type=token_type,
             roles=payload.get("roles", []),
+            scopes=payload.get("scopes", []),
             iss=payload["iss"],
             aud=payload["aud"] if isinstance(payload["aud"], list) else [payload["aud"]],
             exp=payload["exp"],
