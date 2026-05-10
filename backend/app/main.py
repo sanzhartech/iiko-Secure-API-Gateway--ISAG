@@ -4,20 +4,23 @@ main.py — FastAPI Application Entry Point
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.api import auth, proxy, protected, admin
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
-from app.middleware.rate_limiter import _on_rate_limit_exceeded, create_limiter, limiter
+from app.middleware.rate_limiter import _on_rate_limit_exceeded, limiter
 from app.middleware.secure_headers import SecureHeadersMiddleware
 from app.middleware.size_validator import RequestSizeValidatorMiddleware
 from app.middleware.response_filter import ResponseFilterMiddleware
@@ -26,7 +29,7 @@ from app.middleware.metrics import MetricsMiddleware
 from app.core.redis import get_redis_service
 from app.services.iiko_client import IikoClient
 
-from app.db.engine import init_db, AsyncSessionLocal
+from app.db.engine import AsyncSessionLocal, run_migrations
 from app.services.client_service import get_client_by_id
 from app.models.client import GatewayClient
 from app.core.hashing import get_password_hash
@@ -42,7 +45,8 @@ async def seed_demo_client(settings: Settings) -> None:
             demo_client = GatewayClient(
                 client_id="demo-client",
                 hashed_secret=get_password_hash(settings.gateway_client_secret),
-                roles=["operator"]
+                roles=["operator"],
+                scopes=["*"],
             )
             session.add(demo_client)
         
@@ -52,7 +56,8 @@ async def seed_demo_client(settings: Settings) -> None:
             new_admin = GatewayClient(
                 client_id=settings.admin_username,
                 hashed_secret=get_password_hash(settings.admin_password),
-                roles=["admin"]
+                roles=["admin"],
+                scopes=["*"],
             )
             session.add(new_admin)
 
@@ -82,8 +87,8 @@ def _make_lifespan(settings: Settings):
             # This covers test injection and future hot-reload scenarios.
             iiko_client = app.state.iiko_client
 
-        # Initialize SQLite database and tables
-        await init_db()
+        # Apply schema migrations before serving traffic.
+        await asyncio.to_thread(run_migrations, settings.database_url)
         await seed_demo_client(settings)
 
         # [Phase 3] Initialize Redis connection pool
@@ -154,6 +159,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         },
         lifespan=_make_lifespan(settings),
     )
+    static_dir = Path(__file__).resolve().parent / "static"
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     # ── Exception Handlers ───────────────────────────────────────────────────
 
@@ -198,12 +205,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # CORS Stage
     # Add common development ports and explicit origins from settings
     cors_origins = settings.cors_origins_list
-    if "http://localhost:3000" not in cors_origins:
-        cors_origins.append("http://localhost:3000")
-    if "http://localhost:3001" not in cors_origins:
-        cors_origins.append("http://localhost:3001")
-    if "http://localhost" not in cors_origins:
-        cors_origins.append("http://localhost")
+    if settings.app_env != "production":
+        if "http://localhost:3000" not in cors_origins:
+            cors_origins.append("http://localhost:3000")
+        if "http://localhost:3001" not in cors_origins:
+            cors_origins.append("http://localhost:3001")
+        if "http://localhost" not in cors_origins:
+            cors_origins.append("http://localhost")
 
     app.add_middleware(
         CORSMiddleware,
@@ -221,7 +229,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestSizeValidatorMiddleware, max_upload_size=10 * 1024 * 1024)
 
     # Stage 1: Transport Security & Headers (Outermost)
-    #app.add_middleware(SecureHeadersMiddleware)
+    app.add_middleware(SecureHeadersMiddleware)
 
     # [Fix #5] Use the global limiter singleton but ensure it uses the
     # default limit and Redis storage from settings.
@@ -249,8 +257,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             title=app.title + " - Swagger UI",
             oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
             # Используем надежные CDN ссылки для обхода белого экрана
-            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
-            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+            swagger_js_url="/static/swagger-ui-bundle.js",
+            swagger_css_url="/static/swagger-ui.css",
         )
 
     @app.get("/health", tags=["System"], include_in_schema=False)
