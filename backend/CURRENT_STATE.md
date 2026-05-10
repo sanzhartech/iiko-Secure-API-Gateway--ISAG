@@ -1,6 +1,6 @@
 # Current State: ISAG Production Milestone
 
-## 1. Production-Ready Features (100% Implemented)
+## 1. Production-Oriented Features
 - **Hardened Proxy Engine**: Asynchronous, non-buffering streaming reverse proxy. Verified with `LEGIT` traffic archetype.
 - **RS256 JWT Security**:
   - Dynamic **Key Rotation** via `kid` header and `public_keys.json`.
@@ -21,7 +21,7 @@
 
 ## 2. Infrastructure & DevSecOps
 - **Dockerization**: Full-stack orchestration via `docker-compose.yml` (Gateway + Redis + Prometheus + Grafana).
-- **CI/CD**: GitHub Actions pipeline enforcing 65-test verification on every push.
+- **CI/CD**: GitHub Actions pipeline for backend tests plus backend/frontend quality gates.
 - **Secrets Management**: Strict environment validation using `pydantic-settings` — fails startup on missing config.
 
 ## 3. Performance & Resilience

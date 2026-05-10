@@ -1,12 +1,12 @@
 # ISAG — iiko Secure API Gateway
 
-**ISAG (iiko Secure API Gateway)** is a high-performance, asynchronous reverse proxy designed to secure integrations with the iiko API. Operating on a **Zero-Trust** model, it enforces Defense-in-Depth security principles while providing a modern, high-fidelity administrative dashboard.
+**ISAG (iiko Secure API Gateway)** is a high-performance, asynchronous reverse proxy designed to secure integrations with the iiko API. Operating on a **Zero-Trust** model, it enforces Defense-in-Depth security principles while providing a modern administrative dashboard for client management and telemetry.
 
 ## 🌟 Core Features
 
 - **Zero Trust Architecture**: Every request is cryptographically verified (JWT RS256) and strictly authorized via RBAC.
-- **Glassmorphism UI**: A stunning, premium React/Vite dashboard featuring dynamic animations, fluid transitions, and responsive design.
-- **Real-time Threat Feed**: The dashboard features a "Live Event Ticker" mapping recent security events (e.g., token revocation, rate limits) with immediate visual feedback.
+- **Operational Admin UI**: A React/Vite dashboard for client management, audit visibility, and gateway health monitoring.
+- **Telemetry-first Dashboard**: Security events and gateway metrics are rendered from backend telemetry instead of UI-only demo state.
 - **Audit Logging**: Comprehensive, JSON-structured tracking of administrative actions (Client Creation, Secret Rotation, Status Toggling) with IP tracking.
 - **Secret Rotation**: Secure, on-demand client credential lifecycle management directly from the UI without service interruption.
 
@@ -49,23 +49,29 @@ git clone https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-.git
 cd iiko-Secure-API-Gateway--ISAG-
 ```
 
-### 2. Generate RSA Keys
-Before starting, generate the secure keys used for JWT signing:
+### 2. Configure Environment
+Copy the example environment file and replace placeholder secrets before starting:
+```bash
+cp .env.example .env
+```
+
+### 3. Generate RSA Keys
+Generate the secure keys used for JWT signing:
 ```bash
 python scripts/generate_keys.py
 ```
 
-### 3. Launch the Stack
+### 4. Launch the Stack
 Deploy the Postgres database, Redis cache, FastAPI backend, and React/Nginx frontend:
 ```bash
 docker-compose up -d --build
 ```
 
-### 4. Access the Dashboard
+### 5. Access the Dashboard
 Open your browser and navigate to:
 **http://localhost**
 
-Log in using the default credentials specified in your `docker-compose.yml`.
+Log in using the admin credentials you configured in `.env`.
 
 ---
 
@@ -90,5 +96,5 @@ This script will:
 Watch the Admin Dashboard react to these events in real-time!
 
 ---
-**Author**: Karzhaubayev Sanzhar  
+**Author**: Karzhaubay Sanzhar  
 **Status**: 100% Completed / Hardened / Documented
