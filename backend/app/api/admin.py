@@ -227,7 +227,7 @@ async def get_kill_switch_status(
     redis_client: Annotated[redis.Redis, Depends(get_redis)]
 ) -> KillSwitchResponse:
     """Get the current status of the global kill switch."""
-    val = await redis_client.get("isag:global_block")
+    val = await redis_client.get("global_deny")
     return KillSwitchResponse(active=(val == "1"))
 
 @router.post("/kill-switch", response_model=KillSwitchResponse)
@@ -241,9 +241,9 @@ async def set_kill_switch_status(
 ) -> KillSwitchResponse:
     """Activate or deactivate the global kill switch."""
     if body.active:
-        await redis_client.set("isag:global_block", "1")
+        await redis_client.set("global_deny", "1")
     else:
-        await redis_client.delete("isag:global_block")
+        await redis_client.delete("global_deny")
 
     client_ip = get_client_ip(request, trusted_cidrs=settings.trusted_proxy_cidrs_list)
     audit_log = AdminAuditLog(
@@ -265,34 +265,25 @@ async def get_stats(
     db: Annotated[AsyncSession, Depends(get_db_session)]
 ) -> AdminStatsResponse:
     """
-    Parse Prometheus /metrics internally and return a JSON digest.
+    Return a JSON digest of statistics based on GatewayRequestLog.
     Also fetches real time-series data from the database.
     """
-    from prometheus_client import REGISTRY
-    from sqlalchemy import func
+    from sqlalchemy import func, case
     import datetime
     
-    total_requests = 0
-    blocked_requests = 0
-    total_latency = 0.0
-    latency_count = 0
-
-    for metric in REGISTRY.collect():
-        if metric.name == "isag_requests_total":
-            for sample in metric.samples:
-                total_requests += sample.value
-        elif metric.name == "isag_blocked_requests_total":
-            for sample in metric.samples:
-                blocked_requests += sample.value
-        elif metric.name == "isag_request_latency_seconds":
-            for sample in metric.samples:
-                if sample.name == "isag_request_latency_seconds_sum":
-                    total_latency += sample.value
-                elif sample.name == "isag_request_latency_seconds_count":
-                    latency_count += sample.value
-
+    # Calculate totals from the database
+    totals_query = select(
+        func.count().label("total"),
+        func.sum(case((GatewayRequestLog.status_code >= 400, 1), else_=0)).label("errors"),
+        func.avg(GatewayRequestLog.latency_ms).label("avg_lat")
+    )
+    result = await db.execute(totals_query)
+    row = result.fetchone()
+    
+    total_requests = row.total if row and row.total else 0
+    blocked_requests = row.errors if row and row.errors else 0
+    avg_latency = (row.avg_lat / 1000.0) if row and row.avg_lat else 0.0
     error_rate = (blocked_requests / total_requests) if total_requests > 0 else 0.0
-    avg_latency = (total_latency / latency_count) if latency_count > 0 else 0.0
 
     # Fetch real time-series data from GatewayRequestLog for the last 6 hours
     now = datetime.datetime.now(datetime.timezone.utc)

@@ -21,7 +21,7 @@ apiClient.interceptors.response.use(
     // If unauthorized, clear token and redirect to login
     if (error.response?.status === 401) {
       if (window.location.pathname !== '/login') {
-        localStorage.removeItem('admin_access_token');
+        localStorage.clear();
         window.location.href = '/login';
       }
     }

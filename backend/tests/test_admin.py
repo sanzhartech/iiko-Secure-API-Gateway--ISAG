@@ -67,7 +67,7 @@ async def test_admin_kill_switch(async_client: tuple[AsyncClient, ...], make_tok
     response = await client.post("/admin/kill-switch", json={"active": True}, headers=headers)
     assert response.status_code == 200
     assert response.json()["active"] is True
-    mock_redis.set.assert_called_with("isag:global_block", "1")
+    mock_redis.set.assert_called_with("global_deny", "1")
 
     # 2. Check proxy is blocked
     mock_redis.get.return_value = "1"
@@ -80,7 +80,7 @@ async def test_admin_kill_switch(async_client: tuple[AsyncClient, ...], make_tok
     response = await client.post("/admin/kill-switch", json={"active": False}, headers=headers)
     assert response.status_code == 200
     assert response.json()["active"] is False
-    mock_redis.delete.assert_called_with("isag:global_block")
+    mock_redis.delete.assert_called_with("global_deny")
 
 @pytest.mark.asyncio
 async def test_admin_rate_limit_update(async_client: tuple[AsyncClient, ...], make_token):

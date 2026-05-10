@@ -5,9 +5,20 @@ import '../../styles/theme.css';
 
 import { Menu } from 'lucide-react';
 
+import { apiClient } from '../../services/apiClient';
+
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const token = localStorage.getItem('admin_access_token');
   const location = useLocation();
+
+  React.useEffect(() => {
+    if (token) {
+      // Check token validity on mount
+      apiClient.get('/auth/me').catch(() => {
+        // Interceptor will handle 401 redirect
+      });
+    }
+  }, [token]);
 
   if (!token) {
     return <Navigate to="/login" state={{ from: location }} replace />;

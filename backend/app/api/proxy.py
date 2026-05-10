@@ -122,7 +122,7 @@ async def proxy_read(
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
     redis_client: Annotated[redis.Redis, Depends(get_redis)],
 ) -> Response:
-    if await redis_client.get("isag:global_block") == "1":
+    if await redis_client.get("global_deny") == "1":
         logger.warning("proxy_blocked_by_kill_switch", path=path, user_id=claims.sub)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -154,7 +154,7 @@ async def proxy_write(
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
     redis_client: Annotated[redis.Redis, Depends(get_redis)],
 ) -> Response:
-    if await redis_client.get("isag:global_block") == "1":
+    if await redis_client.get("global_deny") == "1":
         logger.warning("proxy_blocked_by_kill_switch", path=path, user_id=claims.sub)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

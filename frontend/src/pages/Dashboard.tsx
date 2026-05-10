@@ -66,10 +66,8 @@ export const Dashboard: React.FC = () => {
           apiClient.get<{active: boolean}>('/admin/kill-switch').catch(() => ({ data: { active: false } }))
         ]);
         
-        // Merge real data with mock if real is empty/zero
-        if (statsRes.data.total_requests > 0) {
-          setStats(statsRes.data);
-        }
+        // Always use real data from the backend
+        setStats(statsRes.data);
         setIsLockdown(killSwitchRes.data.active);
         setPulseActive(false);
         setTimeout(() => setPulseActive(true), 50);
