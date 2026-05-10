@@ -24,6 +24,7 @@ class TokenClaims(BaseModel):
     jti: str = Field(..., description="JWT ID — unique token identifier for replay protection")
     type: Literal["access", "refresh"] = Field("access", description="Type of the token")
     roles: list[str] = Field(default_factory=list, description="User roles")
+    scopes: list[str] = Field(default_factory=list, description="Granted API scopes")
     iss: str = Field(..., description="Issuer")
     aud: list[str] = Field(..., description="Audience")
     exp: int = Field(..., description="Expiry timestamp (Unix)")

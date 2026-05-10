@@ -1,7 +1,7 @@
-Gemini.md — AI Operating & Security Architecture Guide (Hardened Edition)
+Gemini.md — AI Operating \& Security Architecture Guide (Hardened Edition)
 
 Project: iiko Secure API Gateway (ISAG)
-Author: Karzhaubayev Sanzhar
+Author: Karzhaubay Sanzhar
 Security Level: Production-Oriented
 
 1. Architectural Philosophy
@@ -36,7 +36,7 @@ TLS Termination
 
 No stage may be bypassed.
 
-3. Cryptography & Key Management (CRITICAL)
+3. Cryptography \& Key Management (CRITICAL)
 JWT Requirements
 
 Algorithm: RS256 (asymmetric only)
@@ -85,7 +85,7 @@ Optional nonce tracking (in-memory or Redis)
 
 Expire replay cache aligned with token expiration
 
-5. Input Validation & Injection Protection
+5. Input Validation \& Injection Protection
 
 Strict Pydantic schemas
 
@@ -111,7 +111,7 @@ Path traversal
 
 JSON injection
 
-6. Rate Limiting & Abuse Protection
+6. Rate Limiting \& Abuse Protection
 
 Must implement:
 
@@ -139,7 +139,7 @@ Proxy layer MUST:
 
 Strip hop-by-hop headers
 
-Remove client-supplied X-Forwarded-* headers
+Remove client-supplied X-Forwarded-\* headers
 
 Reconstruct forwarding headers internally
 
@@ -153,7 +153,7 @@ Prevent SSRF (whitelist upstream hosts)
 
 Use connection pooling
 
-8. Transport & Headers Security
+8. Transport \& Headers Security
 
 Gateway MUST enforce:
 
@@ -173,7 +173,7 @@ Minimal CORS policy (explicit origin allowlist)
 
 Never use:
 
-CORS "*"
+CORS "\*"
 
 Credentials with wildcard origins
 
@@ -218,19 +218,19 @@ Return sanitized client response
 Example structure:
 
 {
-  "error": "unauthorized",
-  "message": "Invalid token",
-  "request_id": "uuid"
+"error": "unauthorized",
+"message": "Invalid token",
+"request\_id": "uuid"
 }
-11. Logging & Observability
+11. Logging \& Observability
 
 Logging MUST be:
 
 Structured (JSON preferred)
 
-With request_id
+With request\_id
 
-With user_id (if available)
+With user\_id (if available)
 
 Without secrets
 
@@ -254,7 +254,7 @@ Metrics-compatible structure
 
 Correlation ID propagation
 
-12. DoS & Resource Protection
+12. DoS \& Resource Protection
 
 Gateway MUST implement:
 
@@ -387,3 +387,4 @@ Ask clarifying questions
 Default to safest configuration
 
 Never relax security silently.
+
