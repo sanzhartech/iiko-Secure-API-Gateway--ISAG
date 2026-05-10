@@ -80,7 +80,7 @@ def _make_lifespan(settings: Settings):
             log_level=settings.log_level,
             log_format=settings.log_format,
         )
-        logger.info("isag_startup", environment=settings.app_env)
+        logger.info("isag_startup", environment=settings.app_env, host=settings.app_host, port=settings.app_port)
 
         if not hasattr(app.state, "iiko_client") or app.state.iiko_client is None:
             iiko_client = IikoClient(settings)
@@ -264,7 +264,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", tags=["System"], include_in_schema=False)
     async def health() -> dict:
-        return {"status": "ok"}
+        return {"status": "healthy"}
 
     @app.get("/ready", tags=["System"], include_in_schema=False)
     async def ready() -> dict:

@@ -1,7 +1,7 @@
 FROM python:3.12.3-slim-bookworm
 
 # Create a non-root user and group
-RUN groupadd -r isaguser && useradd -r -g isaguser isaguser
+RUN groupadd -r isaggroup && useradd -r -g isaggroup isaguser
 
 WORKDIR /app
 
@@ -16,8 +16,14 @@ COPY requirements.txt .
 RUN echo "asyncpg==0.29.0" >> requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code and set ownership
-COPY --chown=isaguser:isaguser . .
+# Copy application code
+COPY . .
+
+# Ensure the /app/keys directory exists
+RUN mkdir -p /app/keys
+
+# Chown everything to the non-root user
+RUN chown -R isaguser:isaggroup /app
 
 # Switch to non-root user
 USER isaguser
