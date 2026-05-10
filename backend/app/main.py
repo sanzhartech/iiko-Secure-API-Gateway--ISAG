@@ -304,7 +304,7 @@ if __name__ == "__main__":
     _s = get_settings()
     uvicorn.run(
         "app.main:app",
-        host=_s.app_host,
+        host="0.0.0.0",
         port=_s.app_port,
         reload=_s.app_env == "development",
         access_log=False,
