@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: '',
   headers: {
     'Content-Type': 'application/json'
   }
@@ -22,7 +22,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       // Only redirect to login if it was a main info request or if we are not already on login page
       // and if the request was to /auth/me or it's a persistent failure.
-      const isMeRequest = error.config.url.includes('/auth/me');
+      const requestUrl = String(error.config?.url ?? '');
+      const isMeRequest = requestUrl.includes('/auth/me');
       
       if (isMeRequest || window.location.pathname !== '/login') {
          // Optionally try to refresh token here if implemented
