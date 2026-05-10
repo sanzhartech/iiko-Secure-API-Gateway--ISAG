@@ -13,10 +13,13 @@ from app.schemas.admin import (
     ClientCreateRequest,
     ClientCreateResponse,
     ClientStatusUpdateRequest,
+    ClientUpdateRequest,
     AdminStatsResponse,
     AuditLogResponse,
 )
+from app.core.config import Settings, get_settings
 from app.core.hashing import get_password_hash
+from app.core.network import compile_trusted_networks, extract_client_ip
 from app.schemas.token import TokenClaims
 from app.security.jwt_validator import get_current_claims
 from app.core.logging import get_logger
@@ -55,7 +58,8 @@ async def create_client(
     request: Request,
     body: ClientCreateRequest,
     admin: Annotated[TokenClaims, Depends(get_current_admin)],
-    db: Annotated[AsyncSession, Depends(get_db_session)]
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ClientCreateResponse:
     """Create a new client with a generated strong secret."""
     # Check if exists
@@ -77,7 +81,8 @@ async def create_client(
     db.add(new_client)
 
     # Audit Log
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown").split(",")[0].strip()
+    trusted_networks = compile_trusted_networks(settings.trusted_proxy_cidrs_list)
+    client_ip = extract_client_ip(request, trusted_networks)
     audit_log = AdminAuditLog(
         admin_id=admin.sub,
         action="CLIENT_CREATED",
@@ -105,7 +110,8 @@ async def update_client_status(
     client_uuid: uuid.UUID,
     body: ClientStatusUpdateRequest,
     admin: Annotated[TokenClaims, Depends(get_current_admin)],
-    db: Annotated[AsyncSession, Depends(get_db_session)]
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> GatewayClient:
     """Toggle client active/revoked status."""
     result = await db.execute(select(GatewayClient).where(GatewayClient.id == client_uuid))
@@ -117,7 +123,8 @@ async def update_client_status(
     client.is_active = body.is_active
 
     # Audit Log
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown").split(",")[0].strip()
+    trusted_networks = compile_trusted_networks(settings.trusted_proxy_cidrs_list)
+    client_ip = extract_client_ip(request, trusted_networks)
     action = "CLIENT_ACTIVATED" if body.is_active else "CLIENT_REVOKED"
     audit_log = AdminAuditLog(
         admin_id=admin.sub,
@@ -134,12 +141,56 @@ async def update_client_status(
     
     return client
 
+
+@router.patch("/clients/{client_uuid}", response_model=ClientResponse)
+async def update_client(
+    request: Request,
+    client_uuid: uuid.UUID,
+    body: ClientUpdateRequest,
+    admin: Annotated[TokenClaims, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> GatewayClient:
+    """Update mutable client fields without rotating credentials."""
+    result = await db.execute(select(GatewayClient).where(GatewayClient.id == client_uuid))
+    client = result.scalars().first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found.")
+
+    if body.roles is not None:
+        client.roles = body.roles
+    if body.scopes is not None:
+        client.scopes = body.scopes
+    if body.rate_limit is not None:
+        client.rate_limit = body.rate_limit
+    if body.is_active is not None:
+        client.is_active = body.is_active
+
+    trusted_networks = compile_trusted_networks(settings.trusted_proxy_cidrs_list)
+    client_ip = extract_client_ip(request, trusted_networks)
+    audit_log = AdminAuditLog(
+        admin_id=admin.sub,
+        action="CLIENT_UPDATED",
+        target_id=client.client_id,
+        ip_address=client_ip
+    )
+    db.add(audit_log)
+
+    await db.commit()
+    await db.refresh(client)
+
+    logger.info("admin_updated_client", admin=admin.sub, target_client=client.client_id)
+
+    return client
+
 @router.post("/clients/{client_uuid}/rotate-secret", response_model=ClientCreateResponse)
 async def rotate_client_secret(
     request: Request,
     client_uuid: uuid.UUID,
     admin: Annotated[TokenClaims, Depends(get_current_admin)],
-    db: Annotated[AsyncSession, Depends(get_db_session)]
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ClientCreateResponse:
     """Rotate the client secret for a GatewayClient."""
     result = await db.execute(select(GatewayClient).where(GatewayClient.id == client_uuid))
@@ -154,7 +205,8 @@ async def rotate_client_secret(
     client.hashed_secret = hashed_secret
 
     # Audit Log
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown").split(",")[0].strip()
+    trusted_networks = compile_trusted_networks(settings.trusted_proxy_cidrs_list)
+    client_ip = extract_client_ip(request, trusted_networks)
     audit_log = AdminAuditLog(
         admin_id=admin.sub,
         action="SECRET_ROTATED",
@@ -208,19 +260,6 @@ async def get_stats(
     error_rate = (blocked_requests / total_requests) if total_requests > 0 else 0.0
     avg_latency = (total_latency / latency_count) if latency_count > 0 else 0.0
 
-    # Mock time series for the last 6 hours
-    import datetime
-    now = datetime.datetime.now()
-    time_series = []
-    base_requests = total_requests // 6 if total_requests > 0 else 100
-    for i in range(5, -1, -1):
-        dt = now - datetime.timedelta(hours=i)
-        import random
-        time_series.append({
-            "time": dt.strftime("%H:00"),
-            "requests": int(base_requests * random.uniform(0.5, 1.5))
-        })
-
     # Fetch 5 recent events (with fallback)
     recent_events = []
     try:
@@ -235,7 +274,7 @@ async def get_stats(
         total_requests=int(total_requests),
         error_rate=round(error_rate, 4),
         avg_latency=round(avg_latency, 4),
-        time_series=time_series,
+        time_series=[],
         recent_events=recent_events
     )
 
