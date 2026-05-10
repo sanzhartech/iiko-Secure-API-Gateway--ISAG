@@ -90,5 +90,5 @@ This script will:
 Watch the Admin Dashboard react to these events in real-time!
 
 ---
-**Author**: Karzhaubayev Sanzhar  
+**Author**: Karzhaubay Sanzhar  
 **Status**: 100% Completed / Hardened / Documented
