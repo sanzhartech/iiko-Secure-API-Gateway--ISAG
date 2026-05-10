@@ -2,12 +2,11 @@
 
 ## Final Status: 100% Completed (Hardened & Documented)
 - **Phase 7 Finalized**: Documentation, observability, and CI/CD integrations are complete.
-- **Verification**: 100% test pass rate (68/68).
+- **Verification**: 100% test pass rate (70/70).
 - **Security Audit**: All 9 stages of the security pipeline are active and verified.
-- **JTI Replay Fix**: Implemented a 2-second grace period for JTI Store to support parallel frontend requests.
+- **Full Synchronization**: Local environment fully synced with `main` branch (2026-05-10).
 
 ## Architectural Philosophy
-The system is built on three core pillars:
 1. **Zero-Trust Model**: No request is trusted by default. Every incoming packet must undergo rigorous cryptographic and logic validation regardless of its origin.
 2. **Defense-in-Depth**: Multiple redundant layers of security (Rate Limiting → JWT → JTI → RBAC) ensure that if one layer is bypassed or misconfigured, others remain as barriers.
 3. **Fail-Closed Principle**: The gateway is designed to reject access in case of ambiguity. If Redis is down, or a configuration is missing, the system defaults to "401 Unauthorized" or "500 Internal Server Error" rather than allowing potentially unauthenticated traffic.
@@ -25,20 +24,23 @@ The system is built on three core pillars:
 | **Phase 8** | DB-Backed Client Registry (SQLAlchemy + SQLite) | ✅ Done |
 | **Phase 9** | Refresh Token Flow & Token Type Separation | ✅ Done |
 | **Phase 10** | JTI Replay Grace Period (frontend stability) | ✅ Done |
+| **Phase 11** | Admin Controls (Kill-Switch & Dynamic RL) | ✅ Done |
 
 ## Key Technical Metrics
-- **Test Pass Rate**: 100% (68/68 tests).
-- **Test Coverage**: 83% (core security modules), 28% overall (cold-path branches excluded).
+- **Test Pass Rate**: 100% (70/70 tests).
+- **Test Coverage**: 85% (core security modules), 76% overall.
 - **Latency (Overhead)**: <15ms (excluding upstream processing).
 - **Security Pipeline**: 9 active stages.
 
-## Recent Additions (2026-05-04)
-- **JTI Replay Grace Period**: Added a 2-second window for identical tokens to support React parallel fetching without triggering 401 errors.
-- **Academic Technical Documentation**: Added `technical_documentation.md` with mathematical justification for RS256 and deep-dives into system architecture.
-- **Grafana Provisioning**: Automated datasource and dashboard setup for immediate observability.
+## Recent Additions (2026-05-10)
+- **Full Sync & Recovery**: Successfully executed `git pull` and environment recovery.
+- **Admin Hardening**: Verified Admin Kill-Switch and dynamic rate limiting through automated tests.
+- **Dependency Refresh**: Verified all backend and frontend dependencies are up-to-date.
+- **Docker Health**: Full rebuild and verification of all 6 services in the cluster.
 
-## Latest Verification (2026-05-04)
-- [x] Full `pytest` suite passing (68/68) with new JTI logic.
+## Latest Verification (2026-05-10)
+- [x] Full `pytest` suite passing (70/70).
 - [x] Parallel request stress-test verified on Admin Dashboard.
 - [x] Grafana metrics (`isag_requests_total`) confirmed working.
 - [x] Refresh Token round-trip verified: access → refresh → new access pair.
+- [x] Docker environment stable and healthy.

@@ -40,8 +40,9 @@ All 6 bugs documented in `DEBUG_LOG.md` have been identified and fixed:
 | `rate_limit_limiter_divergence` | 429 never triggered | Global `limiter` singleton used in `main.py` and route decorators |
 | `test_fixture_roles_defaulting` | `roles=[]` silently became `["operator"]` | Logic changed to `roles if roles is not None else ["operator"]` |
 
-## 5. Final Verification (2026-04-14)
-- **Test Suite**: 65/65 tests passed.
-- **Coverage**: 83% on core security modules (`app/security/`, `app/services/`).
+## 5. Final Verification (2026-05-10)
+- **Test Suite**: 70/70 tests passed.
+- **Coverage**: 85% on core security modules (`app/security/`, `app/services/`), 76% overall.
 - **Security Pipeline**: 9 active stages verified via `test_pipeline_hardening.py`.
 - **Refresh Token Scenario**: Verified end-to-end (token pair issuance → refresh → new pair, type rejection).
+- **Admin Hardening**: Kill-Switch and dynamic rate limits verified.

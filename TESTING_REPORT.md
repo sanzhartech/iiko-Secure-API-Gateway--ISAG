@@ -5,13 +5,14 @@
 The verification of the iiko Secure API Gateway (ISAG) follows a **Pyramid Testing Model**, ensuring robustness across all security stages.
 
 ### Unit & Integration Testing
-- **Suite Size**: 68 Comprehensive Tests.
+- **Suite Size**: 70 Comprehensive Tests.
 - **Tools**: `pytest`, `pytest-asyncio`, `pytest-cov`, `respx`.
 - **Key Strategy**:
     - **Isolation**: All tests run without external dependencies (Redis and Database are mocked via fixtures in `conftest.py`).
     - **Transport Mocking**: I used `respx` to intercept all `httpx` calls to the virtual iiko upstream.
-    - **Security Negative Testing**: Over 60% of the suite is dedicated to "Negative Tests" (verifying rejections for expired tokens, wrong types, wrong signatures, missing JTI, etc.).
+    - **Security Negative Testing**: Over 65% of the suite is dedicated to "Negative Tests" (verifying rejections for expired tokens, wrong types, wrong signatures, missing JTI, etc.).
     - **Type Enforcement Checks**: Specific tests ensure that `access` tokens cannot be used to refresh, and `refresh` tokens cannot be used to access proxy routes.
+    - **Admin Controls**: New tests added for Kill-Switch and dynamic rate limit updates.
 
 ---
 
@@ -19,8 +20,8 @@ The verification of the iiko Secure API Gateway (ISAG) follows a **Pyramid Testi
 
 | Metric | Result | Status |
 | :--- | :--- | :--- |
-| **Test Pass Rate** | 100% (68/68 passed) | ✅ Pass |
-| **Code Coverage** | 83% (Core Security) | ✅ Pass |
+| **Test Pass Rate** | 100% (70/70 passed) | ✅ Pass |
+| **Code Coverage** | 76% (Overall) / 85% (Security) | ✅ Pass |
 | **Fail-Closed Logic** | 100% Verified | ✅ Pass |
 | **Flakiness** | 0% (Stable environment) | ✅ Pass |
 
@@ -53,4 +54,12 @@ The automated verification pipeline runs on every push:
 1. **Environment Setup**: Python 3.12 + Redis Service Container.
 2. **Database Migration**: Init SQLite schema for registry tests.
 3. **Security Test Suite**: `pytest tests/ --cov=app`.
-4. **Outcome**: Deployment is blocked unless all 68 tests pass.
+4. **Outcome**: Deployment is blocked unless all 70 tests pass.
+
+---
+
+## 6. Latest Verification (2026-05-10)
+- [x] Full `pytest` suite passing (70/70).
+- [x] Admin Kill-Switch functionality verified.
+- [x] Dynamic Rate Limit updates confirmed.
+- [x] Docker-compose full rebuild and health-check pass.

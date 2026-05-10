@@ -77,7 +77,8 @@ class Settings(BaseSettings):
     jwt_clock_skew_seconds: int = Field(default=60, ge=0)
 
     # ── iiko Upstream ────────────────────────────────────────────────────────
-    iiko_api_base_url: str
+    # Base URL for iiko upstream API. In development a mock server can be used.
+    iiko_api_base_url: str = "http://localhost:8000"
     iiko_api_key: str    # used ONLY for upstream iiko authentication
 
     # [Fix 1] Separate credential store for gateway client authentication.
@@ -101,8 +102,9 @@ class Settings(BaseSettings):
     admin_password: Optional[str] = None
 
     # ── CORS ─────────────────────────────────────────────────────────────────
-    cors_allowed_origins: str = ""
-    cors_allow_credentials: bool = False
+    # Development-friendly defaults – allow localhost origins.
+    cors_allowed_origins: str = "http://localhost:3000,http://localhost:3001,http://localhost"
+    cors_allow_credentials: bool = True
 
     # [Fix 4] Trusted proxy CIDRs for X-Forwarded-For validation.
     # Comma-separated CIDR notation. E.g.: "10.0.0.0/8,172.16.0.0/12"
@@ -116,7 +118,8 @@ class Settings(BaseSettings):
     # ── Redis ────────────────────────────────────────────────────────────────
     # [Phase 3] Redis URL for shared state (rate limiting, JTI store).
     # Used by SlowAPI and JTIStore.
-    redis_url: str = "redis://iiko-redis:6379/1"
+    # Redis is optional for local testing – keep a fallback empty string.
+    redis_url: str = ""
     jti_expiry_buffer_seconds: int = 60
     jti_replay_grace_period_seconds: int = 2
 
@@ -235,6 +238,7 @@ class Settings(BaseSettings):
                 "credential coupling vulnerability."
             )
 
+        # Skip HTTPS check when running in development for easier local testing.
         if self.app_env == "production":
             if not self.iiko_api_base_url.startswith("https://"):
                 raise ValueError("IIKO_API_BASE_URL must use HTTPS in production")

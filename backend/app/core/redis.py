@@ -26,7 +26,12 @@ class RedisService:
         self._client: redis.Redis | None = None
 
     async def connect(self) -> None:
-        """Initialize the Redis connection pool."""
+        """Initialize the Redis connection pool.
+        If `redis_url` is empty, Redis is considered disabled and the method returns silently.
+        """
+        if not self._redis_url:
+            logger.debug("redis_connect_skipped", reason="empty redis_url")
+            return
         if self._client is None:
             try:
                 self._client = redis.from_url(
@@ -42,11 +47,14 @@ class RedisService:
                 raise
 
     async def disconnect(self) -> None:
-        """Close the Redis connection pool."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-            logger.info("redis_disconnected")
+        """Close the Redis connection pool.
+        If Redis was never connected (e.g., empty `redis_url`), this is a no‑op.
+        """
+        if not self._client:
+            return
+        await self._client.aclose()
+        self._client = None
+        logger.info("redis_disconnected")
 
     @property
     def client(self) -> redis.Redis:

@@ -7,7 +7,7 @@ iiko-Secure-API-Gateway-ISAG/
 ├── backend/                    # Core Gateway Application
 │   ├── app/                    # Main Application Logic
 │   │   ├── api/                # [REST] Controllers: auth, proxy, protected
-│   │   ├── core/               # [Shared] Config, Redis, Metrics, Logging, Hashing
+│   │   ├── core/               # [Shared] Config, Redis, Metrics, Logging, Hashing, Network
 │   │   ├── db/                 # [DB] Engine & Session Logic (SQLAlchemy)
 │   │   ├── middleware/         # [Pipeline] Security, Observation, RateLimit
 │   │   ├── models/             # [Entity] GatewayClient (DB Schema)
@@ -17,7 +17,7 @@ iiko-Secure-API-Gateway-ISAG/
 │   │   └── main.py             # App Factory & Middleware Orchestration
 │   ├── keys/                   # [Security] RSA Private/Public Key Registry
 │   ├── scripts/                # [Utility] Generation & Stress-test scripts
-│   ├── tests/                  # [QA] Comprehensive 65-Test Suite
+│   ├── tests/                  # [QA] Comprehensive 70-Test Suite
 │   ├── .env                    # Environment Configuration
 │   ├── CODE_STRUCTURE.md       # Technical module breakdown
 │   ├── API_SPEC.md             # Interface Contract

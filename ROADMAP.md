@@ -32,3 +32,4 @@ As of 2026-05-04, the iiko Secure API Gateway is 100% completed, hardened, and d
 - [x] **Full Observability Stack**: Prometheus + Grafana instrumentation.
 - [x] **High-Fidelity Documentation**: Academic technical report included.
 - [x] **Frontend Stability**: JTI Grace Period implemented for parallel fetching.
+- [x] **Admin Hardening**: Kill-Switch and dynamic rate limit updates implemented.

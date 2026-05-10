@@ -50,5 +50,5 @@ Authentications are verified against an async SQLAlchemy database using Bcrypt f
 
 ## 4. Operational Readiness
 - **Dockerized Stack**: Gateway + Redis + Prometheus + Grafana.
-- **CI/CD**: Automated GitHub Actions validating every push (65 tests).
+- **CI/CD**: Automated GitHub Actions validating every push (70 tests).
 - **Secrets Management**: Fail-fast environment validation with `pydantic-settings`.
