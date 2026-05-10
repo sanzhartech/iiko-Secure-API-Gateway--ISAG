@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./gateway.db"
 
     # ── Application ──────────────────────────────────────────────────────────
-    app_env: Literal["development", "production"] = "development"
+    app_env: Literal["development", "production", "testing"] = "development"
     app_debug: bool = False
     app_host: str = "0.0.0.0"
     app_port: int = 8000

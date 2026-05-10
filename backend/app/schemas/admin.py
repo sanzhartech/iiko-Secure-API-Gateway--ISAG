@@ -36,6 +36,13 @@ class ClientCreateResponse(BaseModel):
 class ClientStatusUpdateRequest(BaseModel):
     is_active: bool
 
+
+class ClientUpdateRequest(BaseModel):
+    roles: list[str] | None = None
+    scopes: list[str] | None = None
+    rate_limit: int | None = Field(default=None, ge=1)
+    is_active: bool | None = None
+
 # --- Stats Schemas ---
 
 class TimeSeriesDataPoint(BaseModel):
