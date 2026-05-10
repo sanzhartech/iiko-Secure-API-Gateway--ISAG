@@ -14,9 +14,7 @@ SECURITY:
   - Same HTTP 401 for wrong client_id OR wrong secret — no user enumeration
 """
 
-import hmac
 import uuid
-import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -40,7 +38,12 @@ logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 
-def _issue_access_token(sub: str, roles: list[str], settings: Settings) -> str:
+def _issue_access_token(
+    sub: str,
+    roles: list[str],
+    scopes: list[str],
+    settings: Settings,
+) -> str:
     """
     Issue a signed RS256 JWT access token.
 
@@ -60,6 +63,7 @@ def _issue_access_token(sub: str, roles: list[str], settings: Settings) -> str:
         "aud": settings.jwt_audience,
         "sub": sub,
         "roles": roles,
+        "scopes": scopes,
         "exp": int(expire.timestamp()),
         "iat": int(now.timestamp()),
         "jti": uuid.uuid4().hex,
@@ -150,6 +154,7 @@ async def issue_token(
     access_token = _issue_access_token(
         sub=body.client_id,
         roles=client.roles,
+        scopes=client.scopes,
         settings=settings,
     )
     refresh_token = _issue_refresh_token(
@@ -217,6 +222,7 @@ async def refresh_token(
     new_access = _issue_access_token(
         sub=claims.sub,
         roles=client.roles,
+        scopes=client.scopes,
         settings=settings,
     )
     new_refresh = _issue_refresh_token(
@@ -247,4 +253,5 @@ async def get_me(
     return {
         "id": claims.sub,
         "roles": claims.roles,
+        "scopes": claims.scopes,
     }
