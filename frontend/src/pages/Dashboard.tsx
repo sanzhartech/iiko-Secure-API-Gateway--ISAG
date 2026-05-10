@@ -61,11 +61,16 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await apiClient.get<AdminStats>('/admin/stats');
+        const [statsRes, killSwitchRes] = await Promise.all([
+          apiClient.get<AdminStats>('/admin/stats'),
+          apiClient.get<{active: boolean}>('/admin/kill-switch').catch(() => ({ data: { active: false } }))
+        ]);
+        
         // Merge real data with mock if real is empty/zero
-        if (res.data.total_requests > 0) {
-          setStats(res.data);
+        if (statsRes.data.total_requests > 0) {
+          setStats(statsRes.data);
         }
+        setIsLockdown(killSwitchRes.data.active);
         setPulseActive(false);
         setTimeout(() => setPulseActive(true), 50);
       } catch (err: any) {
@@ -82,11 +87,23 @@ export const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [showToast]);
 
-  const handleKillSwitch = () => {
-    setIsLockdown(true);
-    setIsKillSwitchModalOpen(false);
-    showToast('SYSTEM LOCKDOWN ACTIVATED. ALL TRAFFIC BLOCKED.', 'error');
-    console.log('KILL SWITCH ENGAGED');
+  const handleKillSwitch = async () => {
+    try {
+      const newStatus = !isLockdown;
+      await apiClient.post('/admin/kill-switch', { active: newStatus });
+      setIsLockdown(newStatus);
+      setIsKillSwitchModalOpen(false);
+      if (newStatus) {
+        showToast('SYSTEM LOCKDOWN ACTIVATED. ALL TRAFFIC BLOCKED.', 'error');
+        console.log('KILL SWITCH ENGAGED');
+      } else {
+        showToast('System lockdown deactivated. Traffic flowing normally.', 'success');
+        console.log('KILL SWITCH DISENGAGED');
+      }
+    } catch (err) {
+      showToast('Failed to toggle kill switch', 'error');
+      setIsKillSwitchModalOpen(false);
+    }
   };
 
   return (
@@ -195,12 +212,16 @@ export const Dashboard: React.FC = () => {
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>EMERGENCY LOCKDOWN</h2>
             </div>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
-              Activating the <strong>Kill Switch</strong> will immediately terminate all external proxying to iiko API. 
-              Only administrative access will remain active. This action is logged and will trigger high-priority alerts.
+              {isLockdown ? 
+                "Deactivating the Kill Switch will restore all external proxying to iiko API. This action is logged." :
+                "Activating the Kill Switch will immediately terminate all external proxying to iiko API. Only administrative access will remain active. This action is logged and will trigger high-priority alerts."
+              }
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button className="btn-revoke" style={{ color: 'var(--text-primary)', borderColor: 'rgba(255,255,255,0.2)' }} onClick={() => setIsKillSwitchModalOpen(false)}>Cancel</button>
-              <button className="kill-switch" onClick={handleKillSwitch}>Engage Lockdown</button>
+              <button className="kill-switch" onClick={handleKillSwitch}>
+                {isLockdown ? 'Deactivate Lockdown' : 'Engage Lockdown'}
+              </button>
             </div>
           </div>
         </div>

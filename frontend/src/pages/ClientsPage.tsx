@@ -32,6 +32,7 @@ export const ClientsPage: React.FC = () => {
   const [confirmRevoke, setConfirmRevoke] = useState<{ id: string; currentStatus: boolean } | null>(null);
   const [confirmRotate, setConfirmRotate] = useState<string | null>(null);
   const [editingRateLimit, setEditingRateLimit] = useState<Client | null>(null);
+  const [preset, setPreset] = useState<'custom' | 'yandex'>('custom');
 
   const fetchClients = async () => {
     try {
@@ -68,8 +69,8 @@ export const ClientsPage: React.FC = () => {
     e.preventDefault();
     if (!editingRateLimit) return;
     try {
-      // Assuming endpoint exists or we mock it
-      await apiClient.patch(`/admin/clients/${editingRateLimit.id}`, { rate_limit: editingRateLimit.rate_limit });
+      // Using correct endpoint
+      await apiClient.patch(`/admin/clients/${editingRateLimit.id}/rate-limit`, { rate_limit: editingRateLimit.rate_limit });
       showToast('Rate limit updated', 'success');
       setEditingRateLimit(null);
       fetchClients();
@@ -97,12 +98,14 @@ export const ClientsPage: React.FC = () => {
       });
       setNewClientSecret({ id: res.data.client_id, secret: res.data.client_secret });
       setShowCreateModal(false);
+      setPreset('custom'); // reset
       fetchClients();
       showToast('Client created successfully', 'success');
     } catch (_err: unknown) {
       showToast('Backend error, mock created', 'success');
       setNewClientSecret({ id: clientId, secret: 'isag_sk_live_mock_' + Math.random().toString(36).substring(7) });
       setShowCreateModal(false);
+      setPreset('custom');
     }
   };
 
@@ -260,13 +263,53 @@ export const ClientsPage: React.FC = () => {
       {/* Create Client Modal */}
       {showCreateModal && (
         <div className="modal-overlay">
-          <div className="modal-content glass-card">
+          <div className="modal-content glass-card" style={{ maxWidth: '450px' }}>
             <h2 style={{ marginBottom: '16px' }}>Create New Client</h2>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)' }}>Preset</label>
+              <select 
+                className="glass-input" 
+                value={preset} 
+                onChange={(e) => setPreset(e.target.value as 'custom' | 'yandex')}
+                style={{ width: '100%', appearance: 'auto', background: 'var(--bg-glass)' }}
+              >
+                <option value="custom">Custom Configuration</option>
+                <option value="yandex">Yandex Delivery</option>
+              </select>
+            </div>
+
             <form onSubmit={handleCreateClient} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <input name="clientId" className="glass-input" placeholder="Client ID (e.g., pos-terminal-1)" required />
-              <input name="roles" className="glass-input" placeholder="Roles (e.g., delivery_app, operator)" />
-              <input name="scopes" className="glass-input" placeholder="Scopes (e.g., orders:write, menu:read)" />
-              <input name="rateLimit" type="number" className="glass-input" placeholder="Rate Limit (req/min)" defaultValue={10} min={1} required />
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Client ID</label>
+                <input name="clientId" className="glass-input" placeholder="e.g., yandex-delivery-kz" required />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Roles (comma separated)</label>
+                <input name="roles" className="glass-input" placeholder="e.g., delivery_app" 
+                       defaultValue={preset === 'yandex' ? 'delivery_app' : ''} 
+                       readOnly={preset === 'yandex'}
+                       style={{ opacity: preset === 'yandex' ? 0.7 : 1 }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Scopes (comma separated)</label>
+                <input name="scopes" className="glass-input" placeholder="e.g., orders:write, menu:read" 
+                       defaultValue={preset === 'yandex' ? 'orders:write, menu:read' : ''} 
+                       readOnly={preset === 'yandex'}
+                       style={{ opacity: preset === 'yandex' ? 0.7 : 1 }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Rate Limit (req/min)</label>
+                <input name="rateLimit" type="number" className="glass-input" 
+                       defaultValue={preset === 'yandex' ? 100 : 10} 
+                       min={1} required 
+                       readOnly={preset === 'yandex'}
+                       style={{ opacity: preset === 'yandex' ? 0.7 : 1 }} />
+              </div>
+
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
                 <button type="button" className="btn-revoke" style={{ color: 'var(--text-primary)', borderColor: 'var(--text-muted)' }} onClick={() => setShowCreateModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary">Create Client</button>
@@ -279,21 +322,34 @@ export const ClientsPage: React.FC = () => {
       {/* One-Time Secret Modal */}
       {newClientSecret && (
         <div className="modal-overlay">
-          <div className="modal-content glass-card" style={{ borderColor: 'var(--accent-cyan)' }}>
-            <h2 style={{ marginBottom: '16px', color: 'var(--accent-cyan)' }}>Client Secret Generated</h2>
+          <div className="modal-content glass-card" style={{ borderColor: 'var(--accent-cyan)', maxWidth: '500px' }}>
+            <h2 style={{ marginBottom: '16px', color: 'var(--accent-cyan)' }}>Client Credentials Generated</h2>
             <p style={{ marginBottom: '16px', color: 'var(--text-secondary)' }}>
-              Copy the secret now. For security reasons, it will <strong>never</strong> be shown again.
+              Copy the Client ID and Secret now. For security reasons, the secret will <strong>never</strong> be shown again.
             </p>
+            
+            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Client ID</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <code style={{ flex: 1, padding: '12px', background: '#000', borderRadius: '8px', color: 'var(--text-primary)' }}>
+                {newClientSecret.id}
+              </code>
+              <button className="btn-primary" onClick={() => copyToClipboard(newClientSecret.id)} title="Copy ID">
+                <Copy size={18} />
+              </button>
+            </div>
+
+            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Client Secret</label>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
               <code style={{ flex: 1, padding: '12px', background: '#000', borderRadius: '8px', wordBreak: 'break-all', color: 'var(--accent-mint)' }}>
                 {newClientSecret.secret}
               </code>
-              <button className="btn-primary" onClick={() => copyToClipboard(newClientSecret.secret)}>
+              <button className="btn-primary" onClick={() => copyToClipboard(newClientSecret.secret)} title="Copy Secret">
                 <Copy size={18} />
               </button>
             </div>
+            
             <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setNewClientSecret(null)}>
-              I have securely stored the secret
+              I have securely stored the credentials
             </button>
           </div>
         </div>

@@ -5,8 +5,11 @@ api/proxy.py — Secure iiko Proxy with Correct Streaming Lifecycle
 from contextlib import AsyncExitStack
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, HTTPException, status
 from starlette.responses import StreamingResponse
+
+import redis.asyncio as redis
+from app.core.redis import get_redis
 
 from app.core.logging import get_logger
 from app.middleware.rate_limiter import limiter
@@ -117,7 +120,14 @@ async def proxy_read(
         Depends(require_permissions(Permission.PROXY_READ)),
     ],
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
 ) -> Response:
+    if await redis_client.get("isag:global_block") == "1":
+        logger.warning("proxy_blocked_by_kill_switch", path=path, user_id=claims.sub)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System is under global lockdown."
+        )
     return await _forward(request, path, claims, iiko_client)
 
 
@@ -142,5 +152,12 @@ async def proxy_write(
         Depends(require_permissions(Permission.PROXY_WRITE)),
     ],
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
 ) -> Response:
+    if await redis_client.get("isag:global_block") == "1":
+        logger.warning("proxy_blocked_by_kill_switch", path=path, user_id=claims.sub)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System is under global lockdown."
+        )
     return await _forward(request, path, claims, iiko_client)

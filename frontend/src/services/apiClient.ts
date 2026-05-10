@@ -20,17 +20,9 @@ apiClient.interceptors.response.use(
   (error) => {
     // If unauthorized, clear token and redirect to login
     if (error.response?.status === 401) {
-      // Only redirect to login if it was a main info request or if we are not already on login page
-      // and if the request was to /auth/me or it's a persistent failure.
-      const isMeRequest = error.config.url.includes('/auth/me');
-      
-      if (isMeRequest || window.location.pathname !== '/login') {
-         // Optionally try to refresh token here if implemented
-         // For now, only redirect if it's the 'me' request that failed
-         if (isMeRequest) {
-           localStorage.removeItem('admin_access_token');
-           window.location.href = '/login';
-         }
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('admin_access_token');
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);

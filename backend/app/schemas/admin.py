@@ -36,6 +36,17 @@ class ClientCreateResponse(BaseModel):
 class ClientStatusUpdateRequest(BaseModel):
     is_active: bool
 
+class ClientRateLimitUpdateRequest(BaseModel):
+    rate_limit: int = Field(..., ge=1)
+
+# --- Kill Switch Schemas ---
+
+class KillSwitchRequest(BaseModel):
+    active: bool
+
+class KillSwitchResponse(BaseModel):
+    active: bool
+
 # --- Stats Schemas ---
 
 class TimeSeriesDataPoint(BaseModel):

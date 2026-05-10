@@ -23,6 +23,7 @@ from __future__ import annotations
 import ipaddress
 import time
 import uuid
+import asyncio
 from typing import Callable
 
 import structlog
@@ -31,6 +32,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from app.core.logging import get_logger
+from app.db.engine import AsyncSessionLocal
+from app.models.audit import GatewayRequestLog
 
 logger = get_logger(__name__)
 
@@ -128,3 +131,19 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                 client_ip=self._get_client_ip(request),
                 decision=decision,
             )
+
+            # Async log to DB for historical stats (fire and forget)
+            async def _log_to_db():
+                try:
+                    async with AsyncSessionLocal() as session:
+                        log_entry = GatewayRequestLog(
+                            client_id=user_id,
+                            status_code=status_code,
+                            latency_ms=latency_ms
+                        )
+                        session.add(log_entry)
+                        await session.commit()
+                except Exception as e:
+                    logger.error("db_audit_log_failed", error=str(e))
+            
+            asyncio.create_task(_log_to_db())

@@ -34,7 +34,14 @@ from app.core.hashing import get_password_hash
 logger = get_logger(__name__)
 
 async def seed_demo_client(settings: Settings) -> None:
-    """Seed the database with default clients from config."""
+    """
+    Seed the database with default clients from config.
+
+    [Sec-1] Admin seeding is CONDITIONAL: only runs when both
+    ADMIN_USERNAME and ADMIN_PASSWORD are explicitly set in environment.
+    If either is absent the application starts without a default admin
+    account, following the fail-secure / least-privilege principles.
+    """
     async with AsyncSessionLocal() as session:
         # 1. Seed Demo Client
         client = await get_client_by_id(session, "demo-client")
@@ -45,20 +52,29 @@ async def seed_demo_client(settings: Settings) -> None:
                 roles=["operator"]
             )
             session.add(demo_client)
-        
-        # 2. Seed Admin Client from env (if provided)
-        admin_client = await get_client_by_id(session, settings.admin_username)
-        if not admin_client:
-            new_admin = GatewayClient(
-                client_id=settings.admin_username,
-                hashed_secret=get_password_hash(settings.admin_password),
-                roles=["admin"]
+
+        # 2. [Sec-1] Seed Admin Client ONLY when credentials are explicitly provided.
+        # Never fall back to default admin/admin — fail-secure design.
+        if settings.admin_username and settings.admin_password:
+            admin_client = await get_client_by_id(session, settings.admin_username)
+            if not admin_client:
+                new_admin = GatewayClient(
+                    client_id=settings.admin_username,
+                    hashed_secret=get_password_hash(settings.admin_password),
+                    roles=["admin"]
+                )
+                session.add(new_admin)
+                logger.info("seeded_admin_client", admin_id=settings.admin_username)
+        else:
+            logger.warning(
+                "admin_seeding_skipped",
+                reason="ADMIN_USERNAME or ADMIN_PASSWORD not set — "
+                       "no default admin account created (fail-secure).",
             )
-            session.add(new_admin)
 
         try:
             await session.commit()
-            logger.info("seeded_default_clients", admin_id=settings.admin_username)
+            logger.info("seeded_default_clients")
         except Exception:
             await session.rollback()
             logger.debug("default_clients_already_seeded")
@@ -221,7 +237,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestSizeValidatorMiddleware, max_upload_size=10 * 1024 * 1024)
 
     # Stage 1: Transport Security & Headers (Outermost)
-    #app.add_middleware(SecureHeadersMiddleware)
+    # [Sec-2] Re-enabled: injects HSTS, X-Frame-Options, CSP, etc. on every response.
+    app.add_middleware(SecureHeadersMiddleware)
 
     # [Fix #5] Use the global limiter singleton but ensure it uses the
     # default limit and Redis storage from settings.

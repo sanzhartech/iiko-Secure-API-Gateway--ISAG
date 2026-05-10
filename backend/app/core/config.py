@@ -11,6 +11,9 @@ REMEDIATION PASS CHANGES:
   [KID]   Added `jwt_public_keys_path` / `jwt_active_kid` for multi-key rotation.
            On startup, public_keys.json is read once into _jwt_public_keys_cache
            (dict[kid, pem]). The validator selects the key by kid from JWT header.
+  [Sec-1] `admin_username` / `admin_password` have NO default values.
+           Admin seeding only occurs when BOTH env vars are explicitly provided.
+           This eliminates the default admin/admin credential vulnerability.
 
 All configuration is loaded strictly from environment variables.
 No secrets are hardcoded. Application fails at startup if required
@@ -22,7 +25,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -90,8 +93,12 @@ class Settings(BaseSettings):
     rate_limit_per_user: str = "50/minute"
     rate_limit_auth_endpoint: str = "10/minute"
 
-    admin_username: str = "admin"
-    admin_password: str = "admin"
+    # [Sec-1] Admin credentials: NO default values.
+    # Both must be provided via environment variables (ADMIN_USERNAME / ADMIN_PASSWORD)
+    # for the admin account to be seeded. If either is absent, seeding is skipped
+    # and the application starts without a default admin — fail-secure design.
+    admin_username: Optional[str] = None
+    admin_password: Optional[str] = None
 
     # ── CORS ─────────────────────────────────────────────────────────────────
     cors_allowed_origins: str = ""
