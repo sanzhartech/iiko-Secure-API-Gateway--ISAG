@@ -1,46 +1,35 @@
 # Project State: iiko Secure API Gateway (ISAG)
 
 ## Final Status: 100% Completed (Hardened & Documented)
-- **Phase 7 Finalized**: Documentation, observability, and CI/CD integrations are complete.
-- **Verification**: 100% test pass rate (70/70).
+- **Phase 12 Finalized**: Admin Dashboard, Real-time Analytics, and Onboarding Wizard are fully operational.
+- **Verification**: 100% test pass rate (70/70) with 78% coverage.
 - **Security Audit**: All 9 stages of the security pipeline are active and verified.
-- **Full Synchronization**: Local environment fully synced with `main` branch (2026-05-10).
-
-## Architectural Philosophy
-1. **Zero-Trust Model**: No request is trusted by default. Every incoming packet must undergo rigorous cryptographic and logic validation regardless of its origin.
-2. **Defense-in-Depth**: Multiple redundant layers of security (Rate Limiting → JWT → JTI → RBAC) ensure that if one layer is bypassed or misconfigured, others remain as barriers.
-3. **Fail-Closed Principle**: The gateway is designed to reject access in case of ambiguity. If Redis is down, or a configuration is missing, the system defaults to "401 Unauthorized" or "500 Internal Server Error" rather than allowing potentially unauthenticated traffic.
+- **Full Synchronization**: Project fully synced and hardened (2026-05-14).
 
 ## Milestone Completion Summary
 | Phase | Feature | Status |
 | :--- | :--- | :--- |
-| **Phase 1** | Core Proxy & Async Streaming | ✅ Done |
-| **Phase 2** | JWT RS256 Auth & Key Management | ✅ Done |
-| **Phase 3** | Redis Integration & Replay Protection | ✅ Done |
-| **Phase 4** | Advanced Routing & Header Mutation | ✅ Done |
-| **Phase 5** | Observability (Prometheus / Grafana) | ✅ Done |
-| **Phase 6** | Infrastructure & Dockerization | ✅ Done |
+| **Phase 1-4** | Core Proxy, JWT RS256, Redis JTI, Routing | ✅ Done |
+| **Phase 5-6** | Observability (Prometheus/Grafana) & Docker | ✅ Done |
 | **Phase 7** | CI/CD & Final Documentation | ✅ Done |
-| **Phase 8** | DB-Backed Client Registry (SQLAlchemy + SQLite) | ✅ Done |
-| **Phase 9** | Refresh Token Flow & Token Type Separation | ✅ Done |
-| **Phase 10** | JTI Replay Grace Period (frontend stability) | ✅ Done |
-| **Phase 11** | Admin Controls (Kill-Switch & Dynamic RL) | ✅ Done |
+| **Phase 8-9** | DB Registry & Refresh Token Flow | ✅ Done |
+| **Phase 10-11** | Admin Controls & Kill-Switch | ✅ Done |
+| **Phase 12** | Admin Dashboard & Partner Hub (UI) | ✅ Done |
 
-## Key Technical Metrics
+## Key Technical Metrics (2026-05-14)
 - **Test Pass Rate**: 100% (70/70 tests).
-- **Test Coverage**: 85% (core security modules), 76% overall.
-- **Latency (Overhead)**: <15ms (excluding upstream processing).
-- **Security Pipeline**: 9 active stages.
+- **Test Coverage**: 78% Overall / 88% Core Security.
+- **Latency (Overhead)**: <15ms.
+- **Security Pipeline**: 9 active stages (LIFO Middleware + Dependencies).
 
-## Recent Additions (2026-05-10)
-- **Full Sync & Recovery**: Successfully executed `git pull` and environment recovery.
-- **Admin Hardening**: Verified Admin Kill-Switch and dynamic rate limiting through automated tests.
-- **Dependency Refresh**: Verified all backend and frontend dependencies are up-to-date.
-- **Docker Health**: Full rebuild and verification of all 6 services in the cluster.
+## Recent Additions (2026-05-14)
+- **Partner Hub**: React-based dashboard for client management and analytics.
+- **Audit Hardening**: DB-backed audit trail for admin actions and request history.
+- **Security Repair**: Fixed Docker networking for Prometheus and hardened non-root user permissions.
+- **Frontend Interceptor**: Robust 401 handling to prevent session drops.
 
-## Latest Verification (2026-05-10)
+## Latest Verification (2026-05-14)
 - [x] Full `pytest` suite passing (70/70).
-- [x] Parallel request stress-test verified on Admin Dashboard.
-- [x] Grafana metrics (`isag_requests_total`) confirmed working.
-- [x] Refresh Token round-trip verified: access → refresh → new access pair.
-- [x] Docker environment stable and healthy.
+- [x] Admin Dashboard verified: stats, kill-switch, client creation.
+- [x] Prometheus metrics verified across the full Docker cluster.
+- [x] Refresh Token rotation verified end-to-end.

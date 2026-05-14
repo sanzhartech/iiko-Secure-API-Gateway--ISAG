@@ -26,6 +26,9 @@ FastAPI/Starlette executes middleware in a "Last-In-First-Out" (LIFO) stack.
 ### 🗄️ Database Layer (`app/db/` & `app/models/`)
 - **`db/engine.py`**: Async SQLAlchemy engine and session management.
 - **`models/client.py`**: `GatewayClient` entity (SQLAlchemy/Pydantic).
+- **`models/user.py`**: Admin User entity for dashboard access.
+- **`models/audit.py`**: `AdminAuditLog` and `GatewayRequestLog` for historical analysis.
+- **`models/admin.py`**: UI-specific configuration models.
 
 ### 🚦 Middlewares (`app/middleware/`)
 - **`metrics.py`**: Observability injection.
@@ -35,6 +38,12 @@ FastAPI/Starlette executes middleware in a "Last-In-First-Out" (LIFO) stack.
 ### 🔄 Proxy Engine (`app/services/`)
 - **`iiko_client.py`**: Async, streaming reverse proxy with path traversal protection.
 - **`client_service.py`**: Registry lookup logic for authenticated clients.
+
+### 👑 Admin & Management (`app/api/admin.py`)
+- **Analytics Engine**: DB-backed statistics and time-series extraction.
+- **Kill-Switch**: Global Redis-backed emergency shutdown.
+- **Audit Interface**: Full transparency of admin actions and request history.
+- **Client Onboarding**: Automated credential generation and status management.
 
 ---
 

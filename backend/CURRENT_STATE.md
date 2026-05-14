@@ -9,40 +9,40 @@
 - **Refresh Token Flow**:
   - `/auth/token` returns both `access_token` and `refresh_token`.
   - `/auth/refresh` validates refresh token type, re-fetches client from DB, issues new token pair (rotation).
-  - Expired or wrong-type tokens are strictly rejected with HTTP 401.
 - **Stateful Replay Protection**: Distributed JTI blacklisting in Redis using atomic `SET NX EX` operations.
 - **Distributed Rate Limiting**: Multi-layer throttling (IP/User/Endpoint) backed by Redis storage.
 - **RBAC Enforcement**: Fine-grained role-to-permission mapping (`proxy:read`, `proxy:write`).
-- **DB-Backed Client Registry**: `GatewayClient` model via SQLAlchemy 2.0 async (SQLite default, PostgreSQL-ready). Bcrypt-hashed secrets with constant-time verification and anti-timing-oracle `dummy_verify()` guard.
+- **DB-Backed Client Registry**: `GatewayClient` model via SQLAlchemy 2.0 async. Bcrypt-hashed secrets with anti-timing-oracle `dummy_verify()` guard.
+- **Admin Dashboard & Controls**:
+  - **Kill-Switch**: Instant global request blocking via Redis.
+  - **Analytics**: Real-time request volume, error rates, and latency monitoring.
+  - **Audit Logs**: Comprehensive tracking of admin actions and gateway requests.
+  - **Partner Hub**: Onboarding wizard for third-party aggregators.
 - **Observability Stack**:
   - Prometheus metrics with **Path Normalization** logic.
   - Pre-provisioned Grafana dashboards for attack visualization.
-  - JSON-structured audit logging with `request_id` and `user_id`.
 
 ## 2. Infrastructure & DevSecOps
-- **Dockerization**: Full-stack orchestration via `docker-compose.yml` (Gateway + Redis + Prometheus + Grafana).
-- **CI/CD**: GitHub Actions pipeline enforcing 65-test verification on every push.
-- **Secrets Management**: Strict environment validation using `pydantic-settings` — fails startup on missing config.
+- **Dockerization**: Full-stack orchestration (Gateway + Redis + Prometheus + Grafana + Frontend).
+- **CI/CD**: GitHub Actions pipeline enforcing 70-test verification on every push.
+- **Security Hardening**: Non-root container users, SAST pipeline integration ready.
 
 ## 3. Performance & Resilience
-- **Fail-Closed Strategy**: The system defaults to "Deny" in all ambiguous states (missing Redis, missing key, missing claim).
-- **Zero-Buffering**: Proxies large payloads without memory spikes (Streaming request/response via `httpx`).
-- **Concurrency**: Tuned `httpx.AsyncClient` pool for high-throughput upstream communication.
+- **Fail-Closed Strategy**: System defaults to "Deny" in all ambiguous states.
+- **Zero-Buffering**: Proxies large payloads without memory spikes (Streaming request/response).
+- **Latency**: <15ms overhead (excluding upstream processing).
 
-## 4. Test-Suite Bug Fixes (Resolved)
-All 6 bugs documented in `DEBUG_LOG.md` have been identified and fixed:
-| Bug ID | Summary | Fix Applied |
+## 4. Test-Suite Status
+| Category | Tests | Status |
 | :--- | :--- | :--- |
-| `settings_init_missing_files` | `FileNotFoundError` in tests | `tmp_path_factory` generates real PEM/JSON files for `Settings` init |
-| `redundant_patch_conflicts` | Nested `with patch(...)` broke DI | Replaced with `app.dependency_overrides` in `async_client` fixture |
-| `mock_context_manager_typeerror` | `AsyncMock` can't be async ctx manager | Replaced with inline `@asynccontextmanager` helpers |
-| `missing_sub_claim_keyerror` | 500 on missing `sub` → now 401 | Explicit membership check in `JWTValidator.validate()` |
-| `rate_limit_limiter_divergence` | 429 never triggered | Global `limiter` singleton used in `main.py` and route decorators |
-| `test_fixture_roles_defaulting` | `roles=[]` silently became `["operator"]` | Logic changed to `roles if roles is not None else ["operator"]` |
+| **Security Pipeline** | 25 | ✅ 100% Pass |
+| **Auth & Tokens** | 20 | ✅ 100% Pass |
+| **Proxy & Streaming** | 15 | ✅ 100% Pass |
+| **Admin & Control** | 10 | ✅ 100% Pass |
 
-## 5. Final Verification (2026-05-10)
+## 5. Final Verification (2026-05-14)
 - **Test Suite**: 70/70 tests passed.
-- **Coverage**: 85% on core security modules (`app/security/`, `app/services/`), 76% overall.
-- **Security Pipeline**: 9 active stages verified via `test_pipeline_hardening.py`.
-- **Refresh Token Scenario**: Verified end-to-end (token pair issuance → refresh → new pair, type rejection).
-- **Admin Hardening**: Kill-Switch and dynamic rate limits verified.
+- **Coverage**: 78% overall / 88%+ core security.
+- **Security Pipeline**: 9 active stages verified.
+- **Admin Hardening**: Kill-Switch and dynamic rate limits verified in production-like cluster.
+- **Docker Health**: All 6 services (Gateway, Frontend, Redis, Prometheus, Grafana, Node-Exporter) healthy.

@@ -21,16 +21,16 @@ Regardless of the network origin, every request must undergo:
 
 ## 2. Integrated Security Pipeline (9 Stages)
 
-Requests traverse the following pipeline (LIFO middleware stack):
+Requests traverse the following pipeline (LIFO middleware stack + Router Dependencies):
 
-1.  **Transport Security (Outermost)**: Enforcing HSTS, CSP, and X-Content-Type protections.
+1.  **Transport Security (Outermost)**: Enforcing HSTS, CSP, and X-Content-Type protections via `SecureHeadersMiddleware`.
 2.  **Request Size Validation**: Immediate rejection of payloads exceeding 10MB to mitigate DoS.
 3.  **Distributed Rate Limiting**: Throttling via Redis to protect the gateway and upstream.
 4.  **CORS Enforcement**: Cross-origin policy validation.
 5.  **Audit Logging**: Metadata collection for security forensics (with correlation IDs).
 6.  **Telemetry**: Prometheus metrics instrumentation with Path Normalization.
-7.  **Authentication & JTI**: JWT RS256 validation (with `kid` rotation) + atomic JTI replay check.
-8.  **RBAC Authorization**: Fine-grained role permission checks.
+7.  **Authentication & JTI**: JWT RS256 validation (with `kid` rotation) + atomic JTI replay check (Router Dependencies).
+8.  **RBAC Authorization**: Fine-grained role permission checks (Router Dependencies).
 9.  **Response Filtering (Innermost)**: Sanitizing outgoing headers (e.g., removing `Server` signatures).
 
 ---
@@ -48,7 +48,8 @@ Authentications are verified against an async SQLAlchemy database using Bcrypt f
 
 ---
 
-## 4. Operational Readiness
-- **Dockerized Stack**: Gateway + Redis + Prometheus + Grafana.
+## 4. Operational Readiness (2026-05-14)
+- **Dockerized Stack**: Gateway + Frontend + Redis + Prometheus + Grafana.
 - **CI/CD**: Automated GitHub Actions validating every push (70 tests).
 - **Secrets Management**: Fail-fast environment validation with `pydantic-settings`.
+- **Admin Hub**: Real-time management console for partner onboarding and analytics.

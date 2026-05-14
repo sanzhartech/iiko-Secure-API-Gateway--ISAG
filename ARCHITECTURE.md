@@ -8,17 +8,17 @@
 
 ## 2. Integrated Security Pipeline (9 Stages)
 
-The core logic resides in the **LIFO Middleware Stack**. By registering middlewares in a specific sequence, we ensure that every request undergoes a mandatory, multi-layered verification before hitting the expensive proxy logic.
+The core logic resides in a hybrid architecture of **FastAPI Middlewares** and **Security Dependencies**. This ensures that every request undergoes a mandatory, multi-layered verification.
 
 | Stage | Component | Category | Purpose |
 | :--- | :--- | :--- | :--- |
-| **1** | **TLS Termination** | Transport | Enforced externally (Docker/LB) + `SecureHeadersMiddleware`. |
+| **1** | **TLS/Headers** | Transport | Enforced via `SecureHeadersMiddleware` (HSTS, CSP, XSS). |
 | **2** | **DoS Protection** | Resource | `RequestSizeValidatorMiddleware` (Max 10MB rejection). |
-| **3** | **Rate Limiting** | Abuse | `SlowAPIMiddleware` (Per-IP / Per-User distributed limits). |
+| **3** | **Rate Limiting** | Abuse | `SlowAPIMiddleware` (Redis-backed distributed limits). |
 | **4** | **CORS Gating** | Origin | `CORSMiddleware` (Strict origin allowlist). |
-| **5** | **Forensics** | Audit | `AuditLogMiddleware` (Structured JSON logging of metadata). |
+| **5** | **Forensics** | Audit | `AuditLogMiddleware` (Historical request tracking). |
 | **6** | **Telemetry** | Observation | `MetricsMiddleware` (Prometheus instrumentation). |
-| **7** | **JWT RS256** | Identity | `JWTValidator` (Signature & Claim verification + Type enforcement). |
+| **7** | **JWT RS256** | Identity | `JWTValidator` (Signature & Claim verification). |
 | **8** | **Replay Protection** | State | `JTIStore` (Atomic JTI blacklist in Redis). |
 | **9** | **RBAC Authorization**| AuthZ | `require_permissions` (Fine-grained role validation). |
 
@@ -28,42 +28,31 @@ The core logic resides in the **LIFO Middleware Stack**. By registering middlewa
 
 ### 🔑 Zero-Downtime Key Rotation (RS256)
 The gateway supports seamless rotation of RSA public keys without service interruption. 
-- **Header Injection**: Clients must include the `kid` (Key ID) field in the JWT header.
+- **Header Injection**: Clients include the `kid` (Key ID) field in the JWT header.
 - **Dynamic Mapping**: `JWTValidator` performs an O(1) lookup in `public_keys.json`.
-- **Backward Compatibility**: If `kid` is missing, the gateway falls back to the default active key.
 
 ### 🛡️ Token Type Separation (Access vs. Refresh)
-To prevent privilege escalation via leaked refresh tokens, ISAG enforces strict type separation:
-- **Access Tokens**: Short-lived, carry `type: access` and `roles`. Required for all `/api/*` routes.
-- **Refresh Tokens**: Long-lived, carry `type: refresh`. Only accepted at `/auth/refresh`.
-- **Fail-Closed Validation**: The `JWTValidator` rejects tokens if the `type` claim does not match the expected context.
+To prevent privilege escalation, ISAG enforces strict type separation:
+- **Access Tokens**: Required for all `/api/*` routes.
+- **Refresh Tokens**: Only accepted at `/auth/refresh` for rotation.
 
-### 🗄️ Secure Client Registry (Bcrypt + DB)
-Authentication is backed by a persistent SQLite/PostgreSQL store using SQLAlchemy 2.0.
-- **One-Way Hashing**: Client secrets are never stored in plaintext; `bcrypt` is used for salted hashing.
-- **Timing Attack Mitigation**: `dummy_verify()` is executed even when a client ID is not found, ensuring consistent response times and preventing client enumeration via timing oracles.
-
-### 🛡️ Atomic Replay Protection (Redis SET NX EX)
-To prevent **Race Conditions** in replay attacks, ISAG uses an atomic Redis primitive:
-```python
-# app/security/jti_store.py
-success = await self._redis.set(name=key, value="1", ex=ttl, nx=True)
-```
-- **NX (Not eXists)**: The key is set *only* if it is currently absent.
-- **EX (Expiration)**: The entry expires automatically when the token dies.
-If `success` is False, the request is immediately rejected.
+### 👑 Admin Management Hub
+A dedicated React-based dashboard provides full visibility into the gateway's operation:
+- **Kill-Switch**: Instant global denial of service via a Redis "global_deny" flag.
+- **Partner Hub**: A wizard-driven interface for onboarding third-party aggregators.
+- **Real-time Stats**: Aggregated metrics from the audit logs and Prometheus.
 
 ---
 
 ## 4. Observability & Telemetry
 
-### Prometheus Cardinality Control
-ISAG solves "Cardinality Explosion" in `app/middleware/metrics.py` by **Route Normalization**:
-- Path `/api/v1/orders/123` is mapped to **`/api/{path}`** as a label.
-- This ensures the metric store remains stable regardless of the number of unique resources accessed.
+### Prometheus & Path Normalization
+ISAG solves "Cardinality Explosion" by **Route Normalization**:
+- Paths like `/api/v1/orders/123` are normalized to **`/api/{path}`** as a label.
+- This ensures stable metrics regardless of the number of unique resources.
 
 ### Grafana Visualization
-The system includes a pre-provisioned dashboard that visualizes the **Three Security Quadrants**:
-1. **Throughput**: Valid requests (HTTP 2xx).
-2. **Abuse**: Rate limited requests (HTTP 429).
-3. **Attacks**: Unauthorized (401), Forbidden (403), and Replay events.
+The system includes pre-provisioned dashboards visualizing:
+1. **Security Health**: Blocked vs. Allowed traffic.
+2. **System Efficacy**: Latency, CPU, and Memory usage.
+3. **Attack Analysis**: Patterns of unauthorized and replay attempts.
