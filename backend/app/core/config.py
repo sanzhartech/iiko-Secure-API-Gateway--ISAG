@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # ── Application ──────────────────────────────────────────────────────────
     app_env: Literal["development", "production"] = "development"
     app_debug: bool = False
-    app_host: str = "0.0.0.0"  # nosec B104: Intentionally binding to all interfaces for Docker
+    app_host: str = "0.0.0.0"  # nosec B104
     app_port: int = 8000
 
     # ── JWT ──────────────────────────────────────────────────────────────────
