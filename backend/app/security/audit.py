@@ -28,6 +28,7 @@ from typing import Callable
 
 import structlog
 from fastapi import Request, Response
+from starlette.background import BackgroundTask, BackgroundTasks
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
@@ -146,4 +147,17 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                 except Exception as e:
                     logger.error("db_audit_log_failed", error=str(e))
             
-            asyncio.create_task(_log_to_db())
+            if response is not None:
+                if response.background is None:
+                    response.background = BackgroundTask(_log_to_db)
+                elif isinstance(response.background, BackgroundTasks):
+                    response.background.add_task(_log_to_db)
+                else:
+                    # It's a single BackgroundTask, convert to BackgroundTasks
+                    old_task = response.background
+                    bg_tasks = BackgroundTasks()
+                    bg_tasks.add_task(old_task.func, *old_task.args, **old_task.kwargs)
+                    bg_tasks.add_task(_log_to_db)
+                    response.background = bg_tasks
+            else:
+                asyncio.create_task(_log_to_db())

@@ -62,7 +62,7 @@ class TestJWTValidation:
     async def test_hs256_algorithm_rejected(self, async_client, make_token, test_settings):
         """HS256-signed token must be rejected (algorithm confusion attack)."""
         client, _, _ = async_client
-        token = make_token(algorithm="HS256", signing_key="some-symmetric-secret")
+        token = make_token(algorithm="HS256", signing_key="some-symmetric-secret-that-is-at-least-32-bytes-long")
 
         response = await client.get(
             "/api/orders",

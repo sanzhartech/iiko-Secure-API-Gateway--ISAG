@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from jose import jwt
+import jwt
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger

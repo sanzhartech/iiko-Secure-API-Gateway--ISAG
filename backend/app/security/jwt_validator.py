@@ -33,8 +33,7 @@ from typing import Annotated, Any, NoReturn
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import ExpiredSignatureError, JWTError, jwt
-from jose.exceptions import JWTClaimsError
+import jwt
 from app.security.jti_store import JTIStore, get_jti_store
 
 from app.core.config import Settings, get_settings
@@ -87,7 +86,7 @@ class JWTValidator:
         # —— Step 1: Parse unverified header (→ algorithm + kid) ——————————
         try:
             unverified_header = jwt.get_unverified_header(raw_token)
-        except JWTError:
+        except jwt.InvalidTokenError:
             self._reject("Malformed JWT header")
 
         alg = unverified_header.get("alg", "")
@@ -119,6 +118,7 @@ class JWTValidator:
                 algorithms=[self._algorithm],
                 audience=self._audience,
                 issuer=self._issuer,
+                leeway=self._clock_skew,
                 options={
                     "verify_signature": True,
                     "verify_exp": True,
@@ -127,16 +127,12 @@ class JWTValidator:
                     "verify_aud": True,
                     "verify_iss": True,
                     "require": ["sub", "exp", "iat", "iss", "aud", "jti"],
-                    "leeway": self._clock_skew,
                 },
             )
-        except ExpiredSignatureError:
+        except jwt.ExpiredSignatureError:
             logger.info("jwt_expired")
             self._reject("Token has expired")
-        except JWTClaimsError as exc:
-            logger.warning("jwt_claims_error", detail=str(exc))
-            self._reject("Invalid token claims")
-        except JWTError as exc:
+        except jwt.InvalidTokenError as exc:
             logger.warning("jwt_decode_error", detail=str(exc))
             self._reject("Invalid token")
 
