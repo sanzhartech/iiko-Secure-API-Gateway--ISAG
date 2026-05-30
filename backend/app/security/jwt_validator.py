@@ -183,8 +183,12 @@ class JWTValidator:
         )
 
         # —— Step 4: Replay Protection (Stage 5) ——————————————————————
-        if await self._jti_store.is_replay(claims.jti, claims.exp):
-            self._reject("Token has already been used")
+        # Only enforce JTI replay protection for refresh tokens.
+        # Access tokens follow standard bearer semantics: reusable until exp.
+        # Refresh tokens are one-time-use: exchanged for a new token pair.
+        if claims.type == "refresh":
+            if await self._jti_store.is_replay(claims.jti, claims.exp):
+                self._reject("Token has already been used")
 
         return claims
 

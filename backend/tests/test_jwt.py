@@ -263,28 +263,27 @@ class TestJWTKeyRotation:
 
     async def test_jti_replay_protection(self, async_client, make_token):
         """
-        [Phase 3] Test that the same token cannot be used twice (Replay Protection).
-        Stage 5 of the Security Pipeline.
+        [Phase 3] Test that the same token cannot be used twice (Replay Protection)
+        for refresh tokens at the /auth/refresh endpoint.
         """
-        client, mock_iiko, mock_redis = async_client
+        client, _, mock_redis = async_client
         mock_redis.get.return_value = None
-        token = make_token()
+        token = make_token(token_type="refresh")
 
-        # Mock successful proxy response
-        from contextlib import asynccontextmanager
-        @asynccontextmanager
-        async def _mock_cm(*args, **kwargs):
-            import httpx as _httpx
-            yield _httpx.Response(200, json={"ok": True})
-        mock_iiko.proxy_request_stream = _mock_cm
+        from unittest.mock import patch, AsyncMock
+        mock_client = AsyncMock()
+        mock_client.is_active = True
+        mock_client.roles = ["operator"]
 
         # First attempt: mock_redis.set returns None (NX=True successful, new token)
         mock_redis.set.side_effect = [None]
 
-        response1 = await client.get(
-            "/api/orders",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+        with patch("app.api.auth.get_client_by_id", new_callable=AsyncMock) as mock_get_client:
+            mock_get_client.return_value = mock_client
+            response1 = await client.post(
+                "/auth/refresh",
+                json={"refresh_token": token},
+            )
         assert response1.status_code == 200
 
         # Second attempt: mock_redis.set returns a timestamp (REPLAY)
@@ -293,32 +292,38 @@ class TestJWTKeyRotation:
         past_timestamp = str(int(time.time()) - 10)
         mock_redis.set.side_effect = [past_timestamp]
 
-        response2 = await client.get(
-            "/api/orders",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+        with patch("app.api.auth.get_client_by_id", new_callable=AsyncMock) as mock_get_client:
+            mock_get_client.return_value = mock_client
+            response2 = await client.post(
+                "/auth/refresh",
+                json={"refresh_token": token},
+            )
         assert response2.status_code == 401
         assert response2.json()["detail"] == "Unauthorized"
 
     async def test_jti_grace_period_allowed(self, async_client, make_token):
         """
-        Test that parallel requests within the 2s grace period are ALLOWED.
-        This supports React frontend's simultaneous fetching.
+        Test that parallel requests within the 2s grace period are ALLOWED
+        for refresh tokens at the /auth/refresh endpoint.
         """
-        client, mock_iiko, mock_redis = async_client
+        client, _, mock_redis = async_client
         mock_redis.get.return_value = None
-        token = make_token()
+        token = make_token(token_type="refresh")
 
-        from contextlib import asynccontextmanager
-        @asynccontextmanager
-        async def _mock_cm(*args, **kwargs):
-            import httpx as _httpx
-            yield _httpx.Response(200, json={"ok": True})
-        mock_iiko.proxy_request_stream = _mock_cm
+        from unittest.mock import patch, AsyncMock
+        mock_client = AsyncMock()
+        mock_client.is_active = True
+        mock_client.roles = ["operator"]
 
         # First attempt: success
         mock_redis.set.side_effect = [None]
-        await client.get("/api/orders", headers={"Authorization": f"Bearer {token}"})
+        with patch("app.api.auth.get_client_by_id", new_callable=AsyncMock) as mock_get_client:
+            mock_get_client.return_value = mock_client
+            response1 = await client.post(
+                "/auth/refresh",
+                json={"refresh_token": token},
+            )
+        assert response1.status_code == 200
 
         # Second attempt: same token but WITHIN 1 second of the first use
         import time
@@ -326,10 +331,13 @@ class TestJWTKeyRotation:
         mock_redis.set.side_effect = [current_timestamp] # simulate key already exists with recent TS
         mock_redis.incr.return_value = 1 # Allow one grace use
 
-        response2 = await client.get(
-            "/api/orders",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+        with patch("app.api.auth.get_client_by_id", new_callable=AsyncMock) as mock_get_client:
+            mock_get_client.return_value = mock_client
+            response2 = await client.post(
+                "/auth/refresh",
+                json={"refresh_token": token},
+            )
         # Should still be 200 due to grace period
         assert response2.status_code == 200
+
 

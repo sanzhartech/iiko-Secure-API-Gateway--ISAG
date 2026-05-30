@@ -60,7 +60,10 @@ class RedisService:
     def client(self) -> redis.Redis:
         """Return the active Redis client."""
         if self._client is None:
-            raise RuntimeWarning("RedisService.connect() was not called.")
+            raise RuntimeError(
+                "Redis is not connected. Ensure RedisService.connect() "
+                "was called during application startup."
+            )
         return self._client
 
 
