@@ -1,34 +1,34 @@
 # ISAG — Future Roadmap & Scaling Vectors
 
-As of 2026-05-14, the iiko Secure API Gateway is 100% completed, hardened, and includes a full-featured Admin Dashboard. This document outlines strategic vectors for future scaling and enterprise hardening.
+This document outlines the finished features and future enterprise scalability paths for the **iiko Secure API Gateway (ISAG)** as of **May 2026**.
 
-## 1. Enterprise Secret Management
-- **HashiCorp Vault Integration**: Transition from local `keys/` storage and `.env` secrets to a centralized secrets engine with automated RSA key rotation.
-- **mTLS (Mutual TLS)**: Implement cryptographically verified communication between the gateway and iiko upstream servers.
+---
 
-## 2. Infrastructure & Data Scaling
-- **PostgreSQL Migration**: Move the current SQLite client registry to a dedicated **PostgreSQL** cluster for high availability.
-- **Redis Cluster**: Horizontal scaling of the Redis storage to support thousands of requests per second.
-- **Service Mesh Integration**: Optimization for Istio/Linkerd within a Kubernetes cluster.
+## 1. Enterprise Secrets Management
+*   **HashiCorp Vault Integration**: Transition the current local `.pem` files key storage to a centralized Vault secrets engine. This will automate key rotation, audit key access, and store client secrets in hardware-backed storage.
+*   **Mutual TLS (mTLS)**: Enforce mTLS between the gateway and upstream iiko API nodes, adding another cryptographic verification layer to prevent man-in-the-middle attacks on the backend network.
 
-## 3. Intelligent Security (AIOps)
-- **ML Anomaly Detection**: Integration of an asynchronous analyzer to detect behavioral anomalies (e.g., credential stuffing) using machine learning.
-- **Adaptive Rate Limiting**: Dynamically adjusting client limits based on real-time threat scores.
+## 2. Infrastructure Scaling
+*   **Horizontal Redis Clustering**: Migrate the single-node Redis cache to a Redis Sentinel or Cluster topology to sustain higher request volumes for rate limiting and JTI replay checks.
+*   **PostgreSQL High Availability**: Scale the PostgreSQL instance to a master-replica configuration with automated failover (e.g. pgpool-II) to ensure 99.99% database uptime for client records and audit logs.
+*   **Kubernetes Ingress Controller**: Wrap the gateway as a custom Kubernetes Ingress controller, auto-scaling backend pods dynamically based on incoming CPU/traffic thresholds.
 
-## 4. Operational Hardening
-- **SAST/DAST Integration**: Full automation of Static and Dynamic Application Security Testing in the CI/CD pipeline.
-- **Multi-Region Deployment**: Global distribution of gateway nodes with latency-based routing.
+## 3. Intelligent Security & Threat Intelligence
+*   **ML Anomaly Detection**: Process the Postgres request logs asynchronously through a Machine Learning engine (e.g., isolation forest) to spot anomalous API patterns, indicating potential data scraping or brute force.
+*   **Adaptive Rate Limits**: Adjust rate limit limits dynamically for specific client IDs based on their real-time anomaly scores.
 
 ---
 
 ## ✅ Completed Strategic Milestones
-- [x] **Asynchronous Reverse Proxy Core**: Non-buffering streaming implementation.
-- [x] **Zero-Trust JWT (RS256)**: Multi-key rotation support and strict claim validation.
-- [x] **Stateful Replay Protection**: Redis-backed JTI tracking.
-- [x] **Distributed Rate Limiting**: Redis-backed throttling.
-- [x] **Advanced Admin Dashboard**: React-based console for real-time monitoring and management.
-- [x] **Partner Hub**: Onboarding wizard and client credential management.
-- [x] **Full Observability Stack**: Prometheus + Grafana instrumentation.
-- [x] **Audit Trail**: DB-backed logging of all administrative and security events.
-- [x] **Frontend Stability**: Robust interceptors for session and token management.
-- [x] **Dockerized Cluster**: Full orchestration of 6 integrated services.
+
+The following milestones are 100% completed, hardened, and verified:
+- [x] **Asynchronous reverse proxy engine**: Zero-buffering streaming proxy with path-traversal safeguards.
+- [x] **Asymmetric JWT Verification**: Cryptographic RS256 validator with dynamic key rotation support.
+- [x] **Token Type Separation**: Complete decoupling of Access and Refresh tokens at validation.
+- [x] **Stateful Replay Protection**: Atomic Redis-backed JTI tracking with a 2-second grace period.
+- [x] **Distributed Rate Limiting**: SlowAPI and Redis-backed IP/client rate limits.
+- [x] **DB-Backed Partner Registry**: Async SQLAlchemy database with Bcrypt and timing-attack guards.
+- [x] **Database Audit Trail**: Full historic logs of admin actions and requests.
+- [x] **Observability Instrumentation**: Prometheus metrics exporter and Grafana dashboard provisioning.
+- [x] **Admin Management UI**: React dashboard featuring live attack visualization, client onboarding wizard, analytics, and global Kill-Switch.
+- [x] **Docker Stack**: Full docker-compose file orchestrating Postgres, Redis, backend, frontend, Prometheus, and Grafana.

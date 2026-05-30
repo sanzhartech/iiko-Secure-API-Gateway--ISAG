@@ -71,7 +71,17 @@ Log in using the default credentials specified in your `docker-compose.yml`.
 ---
 
 ## 📑 Documentation
-For a deep dive into the system's architecture, mathematical justifications, and monitoring setup, see the [Technical Documentation](technical_documentation.md).
+
+For a comprehensive understanding of the system, please refer to the following documentation sections:
+
+*   **[Technical Architecture & Request Flow](ARCHITECTURE.md)** — Architectural design, pipeline breakdown, and key data structures.
+*   **[Deployment & Operations Guide](DEPLOYMENT.md)** — Docker setup, manual startup, Nginx configurations, and setup procedures.
+*   **[Security Controls & Specifications](SECURITY.md)** — Comprehensive cryptography, JWT validation, rate limiting, and replay protection details.
+*   **[Environment Configuration Guide](ENV_CONFIG.md)** — Full specification of environment variables and settings.
+*   **[Troubleshooting Manual](TROUBLESHOOTING.md)** — Diagnostics, recovery steps, and solutions for common operational issues.
+*   **[Testing & Quality Verification Report](TESTING_REPORT.md)** — Test suite results, code coverage, stress testing, and attack simulations.
+*   **[Mathematical & Cryptographic Justifications](technical_documentation.md)** — Proofs of RS256 security, rate-limiting, and auditing database schemas.
+
 
 ## 🛠️ Demo & Defense Presentation
 

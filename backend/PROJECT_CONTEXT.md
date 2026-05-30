@@ -1,55 +1,36 @@
 # PROJECT_CONTEXT: ISAG Architecture & Security Philosophy
 
-**iiko Secure API Gateway (ISAG)** is a hardened, high-performance security layer implemented as an asynchronous reverse proxy. It serves as the single entry point for all client integrations with the iiko ERP/API ecosystem, providing a Zero-Trust environment.
+The **iiko Secure API Gateway (ISAG)** is implemented as a hardened, high-performance security layer. Operating as an asynchronous reverse proxy, it serves as the single entrance gateway for third-party integrations connecting to the iiko API.
+
+---
 
 ## 1. Core Security Philosophies
 
-### 🛡️ Defense-in-Depth
-ISAG implements security as a layered onion. A single failure or misconfiguration in one component (e.g., an overly permissive JWT) is balanced by other layers (e.g., mandatory RBAC or IP-based rate limiting).
-
-### 🚦 Fail-Closed
-Security logic is deterministic. In any state of ambiguity — such as a missing configuration parameter, an unreachable Redis cluster, or a malformed security header — the gateway defaults to the most restrictive state (DENY).
-
-### 🔍 Zero-Trust & Identity
-Regardless of the network origin, every request must undergo:
-1.  **Cryptographic Identity Verification** (RS256 JWT).
-2.  **Token Type Validation**: Access tokens for proxying, Refresh tokens for rotation.
-3.  **Stateful Replay Verification** (JTI/Redis).
-4.  **Authorization Check** (RBAC).
+*   **Defense-in-Depth**: Security controls are stacked in multiple layers. If one layer is bypassed or misconfigured, others (e.g. rate limits, schema validation) catch and block the request.
+*   **Fail-Closed**: In any error state (such as missing environment variables, database lockout, or Redis failure), the gateway defaults to denying the request.
+*   **Zero-Trust**: Every request is verified using RS256 cryptographic signatures, client active states, and role-based permissions, irrespective of network origin.
 
 ---
 
 ## 2. Integrated Security Pipeline (9 Stages)
 
-Requests traverse the following pipeline (LIFO middleware stack + Router Dependencies):
+All requests traverse the following pipeline of LIFO middlewares and FastAPI routing dependencies:
 
-1.  **Transport Security (Outermost)**: Enforcing HSTS, CSP, and X-Content-Type protections via `SecureHeadersMiddleware`.
-2.  **Request Size Validation**: Immediate rejection of payloads exceeding 10MB to mitigate DoS.
-3.  **Distributed Rate Limiting**: Throttling via Redis to protect the gateway and upstream.
-4.  **CORS Enforcement**: Cross-origin policy validation.
-5.  **Audit Logging**: Metadata collection for security forensics (with correlation IDs).
-6.  **Telemetry**: Prometheus metrics instrumentation with Path Normalization.
-7.  **Authentication & JTI**: JWT RS256 validation (with `kid` rotation) + atomic JTI replay check (Router Dependencies).
-8.  **RBAC Authorization**: Fine-grained role permission checks (Router Dependencies).
-9.  **Response Filtering (Innermost)**: Sanitizing outgoing headers (e.g., removing `Server` signatures).
-
----
-
-## 3. Key Technical Decisions
-
-### LIFO Middleware Stack
-Middleware in ISAG is registered in LIFO (Last-In-First-Out) order. This ensures that the most "expensive" processing (like proxying) happens only after the "cheapest" validations (like Request Size and Rate Limiting) have passed.
-
-### Redis Atomic SET NX EX
-To prevent Replay Attacks, ISAG uses Redis `SET (key) 1 NX EX (ttl)`. This atomic operation ensures that even under extreme concurrency, a single `jti` cannot be validated twice.
-
-### Persistent Client Registry
-Authentications are verified against an async SQLAlchemy database using Bcrypt for secret hashing, preventing data leakage in case of DB snapshots being compromised.
+1.  **Transport Security (Outermost)**: `SecureHeadersMiddleware` enforces HSTS, CSP, and X-Frame-Options.
+2.  **DoS Protection**: `RequestSizeValidatorMiddleware` drops request bodies larger than 10MB immediately.
+3.  **Distributed Rate Limiting**: `SlowAPIMiddleware` limits rates per IP and client using Redis.
+4.  **CORS Origin Gating**: `CORSMiddleware` filters browser client cross-origin access.
+5.  **Audit Logging**: `AuditLogMiddleware` registers transaction correlation IDs and prepares DB logs.
+6.  **Telemetry Exporter**: `MetricsMiddleware` registers Prometheus request statistics using URL path-normalization.
+7.  **Asymmetric Verification**: `JWTValidator` verifies RS256 token signatures and checks expiration claims.
+8.  **Replay Protection**: `JTIStore` checks JWT IDs in Redis with a 2-second grace period (specifically for refresh tokens).
+9.  **RBAC Authorization**: FastAPI dependencies verify that roles and scopes match resource permissions.
+10. **Response Filtering (Innermost)**: `ResponseFilterMiddleware` sanitizes outgoing headers to prevent information disclosure.
 
 ---
 
-## 4. Operational Readiness (2026-05-14)
-- **Dockerized Stack**: Gateway + Frontend + Redis + Prometheus + Grafana.
-- **CI/CD**: Automated GitHub Actions validating every push (70 tests).
-- **Secrets Management**: Fail-fast environment validation with `pydantic-settings`.
-- **Admin Hub**: Real-time management console for partner onboarding and analytics.
+## 3. Core Design Decisions
+
+*   **LIFO MiddlewareStack**: Middlewares are executed in reverse registration order. This places low-overhead validations (size validator, IP rate limiter) at the outermost edge, preventing expensive database lookups on DDoS traffic.
+*   **Decoupled Secret Storage**: Upstream access tokens (`IIKO_API_KEY`) and client verification keys (`GATEWAY_CLIENT_SECRET`) are separated, preventing client credential exposures from leaking control of the upstream API.
+*   **Bcrypt & Constant-Time Mocks**: Partner registry passwords are Bcrypt-hashed. If a client ID is not found, the gateway triggers `dummy_verify()` to simulate a hashing delay, preventing timing side-channel attacks.
