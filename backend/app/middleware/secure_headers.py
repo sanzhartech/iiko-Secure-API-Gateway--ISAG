@@ -46,8 +46,10 @@ _SECURITY_HEADERS: dict[str, str] = {
     "Content-Security-Policy": (
         "default-src 'none'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
-        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com; "
+        "img-src 'self' data: https://fastapi.tiangolo.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "connect-src 'self'; "
         "frame-ancestors 'none'"
     ),
     
