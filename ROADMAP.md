@@ -1,34 +1,34 @@
-# ISAG — Future Roadmap & Scaling Vectors
+# ISAG — Будущий план развития и векторы масштабирования
 
-This document outlines the finished features and future enterprise scalability paths for the **iiko Secure API Gateway (ISAG)** as of **May 2026**.
-
----
-
-## 1. Enterprise Secrets Management
-*   **HashiCorp Vault Integration**: Transition the current local `.pem` files key storage to a centralized Vault secrets engine. This will automate key rotation, audit key access, and store client secrets in hardware-backed storage.
-*   **Mutual TLS (mTLS)**: Enforce mTLS between the gateway and upstream iiko API nodes, adding another cryptographic verification layer to prevent man-in-the-middle attacks on the backend network.
-
-## 2. Infrastructure Scaling
-*   **Horizontal Redis Clustering**: Migrate the single-node Redis cache to a Redis Sentinel or Cluster topology to sustain higher request volumes for rate limiting and JTI replay checks.
-*   **PostgreSQL High Availability**: Scale the PostgreSQL instance to a master-replica configuration with automated failover (e.g. pgpool-II) to ensure 99.99% database uptime for client records and audit logs.
-*   **Kubernetes Ingress Controller**: Wrap the gateway as a custom Kubernetes Ingress controller, auto-scaling backend pods dynamically based on incoming CPU/traffic thresholds.
-
-## 3. Intelligent Security & Threat Intelligence
-*   **ML Anomaly Detection**: Process the Postgres request logs asynchronously through a Machine Learning engine (e.g., isolation forest) to spot anomalous API patterns, indicating potential data scraping or brute force.
-*   **Adaptive Rate Limits**: Adjust rate limit limits dynamically for specific client IDs based on their real-time anomaly scores.
+В этом документе описаны завершенные функции и направления масштабирования корпоративного уровня для шлюза **iiko Secure API Gateway (ISAG)** по состоянию на **май 2026 года**.
 
 ---
 
-## ✅ Completed Strategic Milestones
+## 1. Корпоративное управление секретами
+*   **Интеграция с HashiCorp Vault**: Переход от текущего локального хранения PEM-файлов к централизованному механизму секретов Vault. Это позволит автоматизировать ротацию ключей, контролировать доступ к ключам и хранить секреты клиентов в защищенном аппаратном хранилище.
+*   **Взаимный TLS (mTLS)**: Внедрение mTLS между шлюзом и узлами вышестоящего iiko API, что добавит еще один уровень криптографической проверки для предотвращения атак типа «человек посередине» (man-in-the-middle) во внутренней сети.
 
-The following milestones are 100% completed, hardened, and verified:
-- [x] **Asynchronous reverse proxy engine**: Zero-buffering streaming proxy with path-traversal safeguards.
-- [x] **Asymmetric JWT Verification**: Cryptographic RS256 validator with dynamic key rotation support.
-- [x] **Token Type Separation**: Complete decoupling of Access and Refresh tokens at validation.
-- [x] **Stateful Replay Protection**: Atomic Redis-backed JTI tracking with a 2-second grace period.
-- [x] **Distributed Rate Limiting**: SlowAPI and Redis-backed IP/client rate limits.
-- [x] **DB-Backed Partner Registry**: Async SQLAlchemy database with Bcrypt and timing-attack guards.
-- [x] **Database Audit Trail**: Full historic logs of admin actions and requests.
-- [x] **Observability Instrumentation**: Prometheus metrics exporter and Grafana dashboard provisioning.
-- [x] **Admin Management UI**: React dashboard featuring live attack visualization, client onboarding wizard, analytics, and global Kill-Switch.
-- [x] **Docker Stack**: Full docker-compose file orchestrating Postgres, Redis, backend, frontend, Prometheus, and Grafana.
+## 2. Масштабирование инфраструктуры
+*   **Горизонтальная кластеризация Redis**: Перенос одиночного узла кэша Redis в топологию Redis Sentinel или Redis Cluster для поддержки больших объемов запросов при ограничении частоты и проверке повторного использования JTI.
+*   **Высокая доступность PostgreSQL**: Масштабирование экземпляра PostgreSQL до конфигурации «master-replica» с автоматическим переключением при отказе (например, с помощью pgpool-II) для обеспечения отказоустойчивости СУБД на уровне 99.99% для записей клиентов и журналов аудита.
+*   **Kubernetes Ingress Controller**: Упаковка шлюза в качестве кастомного контроллера Kubernetes Ingress с возможностью динамического автоматического масштабирования подов бэкенда в зависимости от нагрузки на процессор и объема входящего трафика.
+
+## 3. Интеллектуальная защита и реагирование на угрозы
+*   **Машинное обучение для обнаружения аномалий**: Асинхронная обработка логов запросов из PostgreSQL с помощью движка машинного обучения (например, алгоритма Isolation Forest) для обнаружения аномальных паттернов вызовов API, указывающих на попытки парсинга данных или брутфорса.
+*   **Адаптивные лимиты (Adaptive Rate Limits)**: Динамическая регулировка ограничений частоты запросов для конкретных Partner ID на основе оценки их уровня аномальности в реальном времени.
+
+---
+
+## ✅ Выполненные стратегические задачи
+
+Следующие этапы проекта полностью завершены, проверены и защищены:
+- [x] **Асинхронный движок обратного прокси**: Потоковое проксирование с нулевой буферизацией и встроенной защитой от атак обхода путей (path traversal).
+- [x] **Асимметричная валидация JWT**: Криптографический validator RS256 с поддержкой динамической ротации ключей.
+- [x] **Разделение типов токенов**: Полное разделение проверки Access и Refresh токенов на уровне валидации.
+- [x] **Состояние защиты от повторных атак**: Атомарное отслеживание JTI на базе Redis с 2-секундным льготным периодом.
+- [x] **Распределенный Rate Limiting**: Интеграция с библиотекой SlowAPI и Redis для распределенного ограничения RPS по IP и идентификаторам клиентов.
+- [x] **Реестр партнеров в БД**: Асинхронная база данных на SQLAlchemy с защитой паролей через Bcrypt и защитой от Timing-атак.
+- [x] **Журнал аудита базы данных**: Полное историческое логирование административных действий и входящих запросов.
+- [x] **Инструменты наблюдаемости (Observability)**: Экспорт метрик для Prometheus и готовая конфигурация панелей мониторинга Grafana.
+- [x] **Административный интерфейс (Admin UI)**: Панель на React с интерактивной визуализацией атак в реальном времени, мастером создания клиентов, аналитикой и глобальным аварийным выключателем (Kill-Switch).
+- [x] **Docker-стек**: Полноценный файл docker-compose, оркеструющий Postgres, Redis, backend, frontend, Prometheus и Grafana.

@@ -1,85 +1,85 @@
-# ISAG — Technical Architecture & Request Flow Analysis
+# ISAG — Техническая архитектура и анализ жизненного цикла запроса
 
-**iiko Secure API Gateway (ISAG)** is an asynchronous, high-performance reverse proxy designed as a security gateway. It represents a production-grade implementation of the **Defense-in-Depth** and **Zero-Trust** security models, specifically tailored for securing third-party integrations with the iiko ERP/API ecosystem.
-
----
-
-## 1. Architectural Philosophy
-
-ISAG operates under the following core design principles:
-*   **Secure-by-Design**: Security checks are integrated into the core request path, ensuring no request bypasses validation.
-*   **Fail-Closed**: In case of database lockups, Redis unreachability, key loading errors, or parsing exceptions, the gateway defaults to blocking the request (`HTTP 401` or `HTTP 500` with sanitized details).
-*   **Zero-Trust Model**: Every request is authenticated and authorized, regardless of origin, using cryptographic signatures (RS256) and Role-Based Access Control (RBAC).
-*   **Defense-in-Depth**: Multiple independent validation layers ensure that if one security constraint is bypassable, others (e.g. rate limits, payload validation) will catch and drop the attack.
+**iiko Secure API Gateway (ISAG)** — это асинхронный высокопроизводительный обратный прокси-сервер (reverse proxy), спроектированный как шлюз безопасности. Он представляет собой промышленную реализацию моделей безопасности **Defense-in-Depth** (эшелонированная защита) и **Zero-Trust** (нулевое доверие), специально адаптированную для защиты сторонних интеграций с экосистемой iiko ERP/API.
 
 ---
 
-## 2. Integrated Security Pipeline (9 Stages)
+## 1. Архитектурная философия
 
-When a request enters the gateway, it traverses a structured stack of **FastAPI Middlewares** and **Security Dependencies** registered in a Last-In-First-Out (LIFO) middleware stack. This order ensures that cheap checks (like payload size) run before expensive ones (like database access or signature validation).
+ISAG функционирует в соответствии со следующими ключевыми принципами проектирования:
+*   **Secure-by-Design (Безопасность как основа)**: Все проверки безопасности интегрированы непосредственно в конвейер обработки запроса, что гарантирует невозможность обхода валидации.
+*   **Fail-Closed (Блокировка при сбое)**: В случае зависания базы данных, недоступности кэша Redis, ошибок загрузки ключей или исключений парсинга, шлюз по умолчанию блокирует запрос (`HTTP 401` или `HTTP 500` с очищенными от внутренней информации деталями).
+*   **Zero-Trust Model (Модель нулевого доверия)**: Каждый запрос аутентифицируется и авторизуется вне зависимости от его источника, с использованием криптографических подписей (RS256) и ролевой модели управления доступом (RBAC).
+*   **Defense-in-Depth (Эшелонированная защита)**: Множество независимых слоев проверки гарантируют, что если одно из ограничений безопасности будет пройдено, другие уровни (например, лимиты частоты запросов или валидация полезной нагрузки) перехватят и отклонят атаку.
+
+---
+
+## 2. Интегрированный конвейер безопасности (9 этапов)
+
+При поступлении запроса в шлюз он проходит через структурированный стек **FastAPI Middleware** и **Security Dependencies**, зарегистрированных в стеке middleware по принципу LIFO (Last-In-First-Out). Такой порядок гарантирует, что «дешевые» проверки (например, размер тела запроса) выполняются до «дорогих» проверок (таких как обращение к базе данных или проверка криптографической подписи).
 
 ```mermaid
 flowchart TD
-    A[Client Request] --> Stage1[1. Secure Headers Middleware]
-    Stage1 --> Stage2[2. Request Size Validation]
-    Stage2 --> Stage3[3. Rate Limiting Middleware]
-    Stage3 --> Stage4[4. CORS Origin Filtering]
-    Stage4 --> Stage5[5. Audit Logging Middleware]
-    Stage5 --> Stage6[6. Telemetry & Metrics Middleware]
-    Stage6 --> Stage7[7. JWT RS256 Verification]
-    Stage7 --> Stage8[8. Redis JTI Replay Protection]
-    Stage8 --> Stage9[9. RBAC Authorization]
-    Stage9 --> Upstream[Secure Proxy to iiko API]
+    A[Запрос клиента] --> Stage1[1. Заголовки безопасности]
+    Stage1 --> Stage2[2. Валидация размера запроса]
+    Stage2 --> Stage3[3. Ограничение частоты (Rate Limit)]
+    Stage3 --> Stage4[4. Фильтрация CORS-источников]
+    Stage4 --> Stage5[5. Логирование аудита]
+    Stage5 --> Stage6[6. Сбор метрик и телеметрии]
+    Stage6 --> Stage7[7. Валидация JWT RS256]
+    Stage7 --> Stage8[8. Защита от повторов JTI в Redis]
+    Stage8 --> Stage9[9. Авторизация RBAC]
+    Stage9 --> Upstream[Безопасное проксирование в iiko API]
 ```
 
-| Stage | Component | Category | Purpose | Implementation details |
+| Этап | Компонент | Категория | Назначение | Детали реализации |
 | :--- | :--- | :--- | :--- | :--- |
-| **1** | **TLS/Secure Headers** | Transport | Injects HSTS, CSP, X-Frame-Options, XSS protection headers. | [secure_headers.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/secure_headers.py) |
-| **2** | **DoS Protection** | Resource | Rejects request bodies larger than 10MB immediately. | [size_validator.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/size_validator.py) |
-| **3** | **Rate Limiting** | Abuse | Limits request rates per-IP and per-Client using Redis. | [rate_limiter.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/rate_limiter.py) |
-| **4** | **CORS Gating** | Origin | Verifies client browser requests against a strict allowed origin list. | FastAPI `CORSMiddleware` in [main.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/main.py) |
-| **5** | **Audit Logging** | Forensics | Generates correlation IDs and prepares DB logs for request trail. | [audit.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/audit.py) |
-| **6** | **Telemetry** | Observation | Logs Prometheus metrics with path-normalization to prevent leaks. | [metrics.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/metrics.py) |
-| **7** | **JWT RS256** | Identity | Validates token signatures using public keys and expiration claims. | [jwt_validator.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/jwt_validator.py) |
-| **8** | **Replay Protection** | State | Stateful JTI checking in Redis with a 2-second grace period. | [jti_store.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/jti_store.py) |
-| **9** | **RBAC Authorization** | AuthZ | Enforces roles and scopes permissions on targeted endpoints. | [rbac.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/rbac.py) |
+| **1** | **TLS/Безопасные заголовки** | Транспорт | Внедрение заголовков HSTS, CSP, X-Frame-Options, XSS. | [secure_headers.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/secure_headers.py) |
+| **2** | **Защита от DoS** | Ресурсы | Немедленное отклонение тел запросов размером более 10 МБ. | [size_validator.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/size_validator.py) |
+| **3** | **Rate Limiting** | Злоупотребления | Ограничение частоты запросов на IP-адрес и на клиента с помощью Redis. | [rate_limiter.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/rate_limiter.py) |
+| **4** | **Фильтрация CORS** | Источники | Проверка браузерных запросов клиентов по строгому белому списку разрешенных источников. | FastAPI `CORSMiddleware` in [main.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/main.py) |
+| **5** | **Логирование аудита** | Форензика | Генерация ID корреляции и подготовка логов БД для трассировки запросов. | [audit.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/audit.py) |
+| **6** | **Телеметрия** | Наблюдаемость | Логирование метрик Prometheus с нормализацией путей для предотвращения утечек. | [metrics.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/middleware/metrics.py) |
+| **7** | **JWT RS256** | Идентификация | Проверка подписи токенов с использованием открытых ключей и параметров exp. | [jwt_validator.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/jwt_validator.py) |
+| **8** | **Защита от повторов** | Состояние | Проверка JTI с состоянием в Redis и 2-секундным льготным периодом. | [jti_store.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/jti_store.py) |
+| **9** | **Авторизация RBAC** | Авторизация | Применение прав доступа ролей и скоупов (scopes) к целевым эндпоинтам. | [rbac.py](file:///d:/Desktop/Дипломка%20-%20iiko%20Secure%20API%20Gateway%20(ISAG)/backend/app/security/rbac.py) |
 
 ---
 
-## 3. Core Security & Architecture Mechanisms
+## 3. Основные механизмы безопасности и архитектуры
 
-### 🔑 Zero-Downtime Key Rotation (RS256)
-ISAG implements public-key cryptography to verify client credentials. Tokens are signed by the gateway using a private key and validated using corresponding public keys:
-- **Header Injection**: Clients specify the Key ID (`kid`) in their token's header.
-- **On-Demand Key Store**: The `JWTValidator` checks the `kid` and matches it against `keys/public_keys.json` (loaded in memory on startup to avoid disk I/O). 
-- **Rotation**: Administrators can add new public keys to the JSON store, issue tokens with the new `kid`, and phase out old keys without causing service downtime or restarts.
+### 🔑 Бесперебойная ротация ключей (RS256)
+ISAG использует асимметричное шифрование для проверки учетных данных клиентов. Токены подписываются шлюзом с использованием закрытого ключа и проверяются с помощью соответствующих открытых ключей:
+- **Внедрение заголовка**: Клиенты указывают идентификатор ключа (`kid`) в заголовке своего токена.
+- **Хранилище открытых ключей по требованию**: Класс `JWTValidator` проверяет `kid` и сопоставляет его с `keys/public_keys.json` (загружается в память при запуске для исключения дискового ввода-вывода).
+- **Ротация**: Администраторы могут добавлять новые открытые ключи в файл реестра, выпускать токены с новым `kid` и постепенно выводить из обращения старые ключи без перезапуска сервисов или сбоев в обслуживании.
 
-### 🛡️ Token Type Separation (Access vs. Refresh)
-To prevent privilege escalation, ISAG enforces token type separation:
-- **Access Tokens**: Short-lived (15 minutes), containing client roles/scopes, used to access `/api/*` proxies. If presented to the refresh endpoint, they are immediately rejected.
-- **Refresh Tokens**: Long-lived (7 days), containing no roles/scopes, used exclusively at `/auth/refresh` to rotate token pairs. If presented to proxy routes, they are rejected.
+### 🛡️ Разделение типов токенов (Access vs. Refresh)
+Для предотвращения эскалации привилегий ISAG строго разграничивает типы токенов:
+- **Access-токены (Токены доступа)**: Короткоживущие (15 минут), содержат роли и скоупы клиента, используются для доступа к проксируемым эндпоинтам `/api/*`. При попытке отправить их на эндпоинт обновления токенов они немедленно отклоняются.
+- **Refresh-токены (Токены обновления)**: Долгоживущие (7 дней), не содержат ролей и скоупов, используются исключительно на эндпоинте `/auth/refresh` для обновления пары токенов. При попытке доступа к прокси-маршрутам они отклоняются.
 
-### 🔄 Stateful Replay Protection (JTI Grace Window)
-To prevent network sniffers from capturing and reusing tokens, refresh tokens must be single-use.
-- **Atomic Registration**: When a refresh token is presented, its JWT ID (`jti`) is written to Redis using an atomic `SET NX EX` command, set to expire alongside the token.
-- **Parallel Race Mitigation (Grace Window)**: High-latency connections or browser retries can spawn duplicate requests. To prevent dropping legitimate calls, ISAG supports a configurable `jti_replay_grace_period_seconds` (default: 2s). The first reuse within 2 seconds increments an atomic Redis counter `isag:jti:grace:{jti}`; if the counter exceeds 1 (indicating a third use) or the time delta exceeds 2s, the request is hard-blocked.
+### 🔄 Состояние защиты от повторных атак (JTI Grace Window)
+Для предотвращения перехвата и повторного использования токенов обновления, refresh-токены должны быть одноразовыми.
+- **Атомарная регистрация**: При предъявлении refresh-токена его уникальный идентификатор (`jti`) записывается в Redis с помощью атомарной команды `SET NX EX` со временем жизни, соответствующим времени истечения токена.
+- **Смягчение гонки параллельных запросов (Grace Window)**: Из-за задержек сети или повторных попыток отправки со стороны браузера могут возникать дублирующиеся запросы. Чтобы избежать блокировки легитимных вызовов, ISAG поддерживает настраиваемый льготный период `jti_replay_grace_period_seconds` (по умолчанию 2 секунды). Первая попытка повторного использования в течение 2 секунд увеличивает атомарный счетчик в Redis `isag:jti:grace:{jti}`; если счетчик превышает 1 (что указывает на третью попытку использования) или разница во времени превышает 2 секунды, запрос жестко блокируется.
 
-### ⚡ Anti-Timing Oracle Safeguard
-To prevent attackers from enumerating valid client IDs by analyzing response times:
-- Database authentication lookups use a constant-time hashing validation flow.
-- If a client ID is not found in the SQL registry, a dummy password validation `dummy_verify()` is triggered. This introduces a cryptographically comparable verification delay, blinding side-channel attack attempts.
+### ⚡ Защита от Timing-атак (Oracle Safeguard)
+Чтобы злоумышленники не могли определить существующие идентификаторы клиентов путем анализа времени ответа сервера:
+- Проверка аутентификации в базе данных выполняется по алгоритму сравнения хэшей с постоянным временем выполнения (constant-time hashing).
+- Если идентификатор клиента не найден в SQL-реестре, запускается фиктивная верификация пароля `dummy_verify()`. Это создает сопоставимую с реальной криптографическую задержку проверки, маскируя работу шлюза от атак по сторонним каналам (side-channel attacks).
 
 ---
 
-## 4. Observability, Telemetry & Monitoring
+## 4. Наблюдаемость, телеметрия и мониторинг
 
-### Prometheus Metrics
-To maintain high performance, metric labels must be strictly bound:
-- **Cardinality Explosion Mitigation**: Dynamic variables in URLs (e.g. `/api/v1/orders/12345`) are normalized in metrics to `/api/{path}`.
-- Normalization prevents Prometheus database bloat and ensures fast dashboard queries under high volume.
+### Метрики Prometheus
+Для поддержания высокой производительности метки (labels) метрик строго контролируются:
+- **Предотвращение взрывного роста кардинальности (Cardinality Explosion)**: Динамические переменные в URL-адресах (например, `/api/v1/orders/12345`) нормализуются в метриках до формата `/api/{path}`.
+- Нормализация предотвращает раздувание базы данных Prometheus и гарантирует быстрое выполнение запросов к панели мониторинга при высоком объеме трафика.
 
-### Grafana Dashboards
-The monitoring stack includes automated provisioning configuration to load predefined metrics dashboards. The dashboards track:
-1.  **Security Events**: Blocked rate limits, invalid JWTs, expired signatures, and replay block distributions.
-2.  **Performance Metrics**: Request latencies, upstream proxy delay, memory and CPU footprints.
-3.  **Client Analytics**: RPS breakdown by partner ID.
+### Панели мониторинга Grafana
+Стек мониторинга включает автоматическое конфигурирование для загрузки предопределенных панелей. Они отслеживают:
+1.  **События безопасности**: Заблокированные по лимитам запросы, невалидные JWT, токены с истекшим сроком подписи и распределение блокировок по повторным запросам (replay blocks).
+2.  **Метрики производительности**: Задержки обработки запросов (latency), время ожидания ответа от upstream-прокси, потребление памяти и процессора.
+3.  **Аналитика клиентов**: Разбивка количества запросов в секунду (RPS) по идентификаторам партнеров (Partner ID).

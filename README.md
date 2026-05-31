@@ -1,105 +1,105 @@
 # ISAG — iiko Secure API Gateway
 
-**ISAG (iiko Secure API Gateway)** is a high-performance, asynchronous reverse proxy designed to secure integrations with the iiko API. Operating on a **Zero-Trust** model, it enforces Defense-in-Depth security principles while providing a modern, high-fidelity administrative dashboard.
+**ISAG (iiko Secure API Gateway)** — это высокопроизводительный асинхронный обратный прокси-сервер (reverse proxy), разработанный для обеспечения безопасности интеграций с iiko API. Работая по модели **Zero-Trust** (нулевого доверия), он реализует принципы эшелонированной защиты (Defense-in-Depth) и предоставляет современную административную панель управления с высоким качеством интерфейса.
 
-## 🌟 Core Features
+## 🌟 Ключевые возможности
 
-- **Zero Trust Architecture**: Every request is cryptographically verified (JWT RS256) and strictly authorized via RBAC.
-- **Glassmorphism UI**: A stunning, premium React/Vite dashboard featuring dynamic animations, fluid transitions, and responsive design.
-- **Real-time Threat Feed**: The dashboard features a "Live Event Ticker" mapping recent security events (e.g., token revocation, rate limits) with immediate visual feedback.
-- **Audit Logging**: Comprehensive, JSON-structured tracking of administrative actions (Client Creation, Secret Rotation, Status Toggling) with IP tracking.
-- **Secret Rotation**: Secure, on-demand client credential lifecycle management directly from the UI without service interruption.
+- **Архитектура Zero-Trust**: Каждый запрос криптографически проверяется (JWT RS256) и строго авторизуется через механизм RBAC.
+- **Интерфейс в стиле Glassmorphism**: Потрясающая премиальная панель управления на React/Vite с динамической анимацией, плавными переходами и адаптивным дизайном.
+- **Лента угроз в реальном времени (Threat Feed)**: Панель управления содержит интерактивный «Live Event Ticker», отображающий недавние события безопасности (например, отзыв токенов, превышение лимитов запросов) с мгновенной визуальной обратной связью.
+- **Аудит логов (Audit Logging)**: Комплексное логирование административных действий (создание клиентов, ротация секретов, изменение статуса) в формате JSON с фиксацией IP-адресов.
+- **Ротация секретов**: Безопасное управление жизненным циклом учетных данных клиентов по требованию непосредственно из интерфейса без прерывания работы сервиса.
 
 [![CI — ISAG Test Suite](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Tests](https://img.shields.io/badge/tests-70%2F70-brightgreen.svg)
 
-## 🏗️ Architecture
+## 🏗️ Архитектура
 
 ```mermaid
 graph LR
-    A[Client App] -->|HTTPS Request| B(ISAG Nginx/Proxy)
-    B --> C{ISAG Backend}
+    A[Клиентское приложение] -->|HTTPS-запрос| B(ISAG Nginx/Прокси)
+    B --> C{ISAG Бэкенд}
     
-    subgraph Security Pipeline
-        C -->|1. Rate Limit Check| D[Redis]
-        C -->|2. JWT Verification| E[RSA Keys]
-        C -->|3. RBAC & Scopes| F[(PostgreSQL)]
+    subgraph Конвейер безопасности (Security Pipeline)
+        C -->|1. Проверка лимитов| D[Redis]
+        C -->|2. Проверка JWT| E[RSA Ключи]
+        C -->|3. RBAC и Scopes| F[(PostgreSQL)]
     end
     
-    C -->|Secure Proxy| G[iiko API Upstream]
+    C -->|Безопасное проксирование| G[Upstream iiko API]
     
-    H[Admin User] -->|Manage| I[ISAG Admin UI]
-    I -->|API Calls| C
+    H[Администратор] -->|Управление| I[ISAG Admin UI]
+    I -->|API-запросы| C
 ```
 
-## 🛡️ Security Features
+## 🛡️ Функции безопасности
 
-- **Scopes & Granular Access**: Each client is provisioned with specific API scopes (e.g., `orders:read`), ensuring they can only access the endpoints they explicitly need.
-- **Rate Limits**: Configurable per-client and global rate limits prevent abuse, resource exhaustion, and DoS attacks.
-- **Replay Protection**: Strict JWT ID (JTI) tracking prevents captured tokens from being reused.
+- **Гранулярный доступ и Scopes**: Каждому клиенту выделяются определенные области доступа API (например, `orders:read`), что гарантирует доступ только к тем эндпоинтам, которые ему действительно необходимы.
+- **Ограничение частоты запросов (Rate Limits)**: Настраиваемые глобальные и индивидуальные (для каждого клиента) лимиты частоты запросов предотвращают злоупотребления, исчерпание ресурсов и DoS-атаки.
+- **Защита от повторных атак (Replay Protection)**: Строгий контроль идентификаторов JWT (JTI) предотвращает повторное использование перехваченных токенов.
 
-## 🚀 Quick Start (One-Click Deployment)
+## 🚀 Быстрый старт (Запуск в один клик)
 
-Ensure you have Docker and Docker Compose installed.
+Убедитесь, что у вас установлены Docker and Docker Compose.
 
-### 1. Clone & Configure
+### 1. Клонирование и настройка
 ```bash
 git clone https://github.com/sanzhartech/iiko-Secure-API-Gateway--ISAG-.git
 cd iiko-Secure-API-Gateway--ISAG-
 ```
 
-### 2. Generate RSA Keys
-Before starting, generate the secure keys used for JWT signing:
+### 2. Генерация ключей RSA
+Перед запуском сгенерируйте безопасные ключи для подписи JWT:
 ```bash
 python scripts/generate_keys.py
 ```
 
-### 3. Launch the Stack
-Deploy the Postgres database, Redis cache, FastAPI backend, and React/Nginx frontend:
+### 3. Запуск стека
+Разверните базу данных Postgres, кэш Redis, бэкенд FastAPI и фронтенд React/Nginx:
 ```bash
 docker-compose up -d --build
 ```
 
-### 4. Access the Dashboard
-Open your browser and navigate to:
+### 4. Доступ к панели управления
+Откройте браузер и перейдите по адресу:
 **http://localhost**
 
-Log in using the default credentials specified in your `docker-compose.yml`.
+Используйте для входа стандартные учетные данные, указанные в вашем файле `docker-compose.yml`.
 
 ---
 
-## 📑 Documentation
+## 📑 Документация
 
-For a comprehensive understanding of the system, please refer to the following documentation sections:
+Для глубокого понимания системы ознакомьтесь со следующими разделами документации:
 
-*   **[Technical Architecture & Request Flow](ARCHITECTURE.md)** — Architectural design, pipeline breakdown, and key data structures.
-*   **[Deployment & Operations Guide](DEPLOYMENT.md)** — Docker setup, manual startup, Nginx configurations, and setup procedures.
-*   **[Security Controls & Specifications](SECURITY.md)** — Comprehensive cryptography, JWT validation, rate limiting, and replay protection details.
-*   **[Environment Configuration Guide](ENV_CONFIG.md)** — Full specification of environment variables and settings.
-*   **[Troubleshooting Manual](TROUBLESHOOTING.md)** — Diagnostics, recovery steps, and solutions for common operational issues.
-*   **[Testing & Quality Verification Report](TESTING_REPORT.md)** — Test suite results, code coverage, stress testing, and attack simulations.
-*   **[Mathematical & Cryptographic Justifications](technical_documentation.md)** — Proofs of RS256 security, rate-limiting, and auditing database schemas.
+*   **[Техническая архитектура и жизненный цикл запроса](ARCHITECTURE.md)** — архитектурные решения, этапы конвейера безопасности и ключевые структуры данных.
+*   **[Руководство по развертыванию и эксплуатации](DEPLOYMENT.md)** — настройка Docker, ручной запуск, конфигурация Nginx и процедуры развертывания.
+*   **[Механизмы безопасности и спецификации](SECURITY.md)** — подробное описание криптографии, валидации JWT, ограничения частоты запросов и защиты от повторных атак.
+*   **[Руководство по конфигурации окружения](ENV_CONFIG.md)** — полная спецификация переменных окружения и настроек.
+*   **[Руководство по устранению неполадок](TROUBLESHOOTING.md)** — диагностика, шаги по восстановлению и решения типичных проблем.
+*   **[Отчет о тестировании и качестве](TESTING_REPORT.md)** — результаты тестов, покрытие кода, нагрузочные тесты и симуляция атак.
+*   **[Математические и криптографические обоснования](technical_documentation.md)** — доказательства безопасности RS256, алгоритмы ограничения RPS и схемы базы данных аудита.
 
 
-## 🛠️ Demo & Defense Presentation
+## 🛠️ Демонстрация и защита проекта
 
-To demonstrate the gateway's real-time defensive capabilities during a presentation, run the provided `demo_attack.py` script:
+Чтобы продемонстрировать защитные возможности шлюза в режиме реального времени во время презентации/защиты, запустите скрипт `demo_attack.py`:
 
 ```bash
-# Requires python requests library
+# Требуются библиотеки python requests и colorama
 pip install requests colorama
 python demo_attack.py
 ```
 
-This script will:
-1. Send valid requests (showing the "Network Pulse").
-2. Send an aggressive burst to trigger `RATE_LIMIT_EXCEEDED` (Crimson Red glow in the Live Feed).
-3. Send forged tokens to demonstrate `UNAUTHORIZED` blocks.
+Этот скрипт выполнит следующие действия:
+1. Отправит валидные запросы (отображая «пульс сети»).
+2. Запустит агрессивный всплеск запросов для срабатывания блокировки `RATE_LIMIT_EXCEEDED` (в панели управления появится красное свечение в ленте событий).
+3. Отправит поддельные токены для демонстрации блокировки `UNAUTHORIZED`.
 
-Watch the Admin Dashboard react to these events in real-time!
+Следите за реакцией панели администратора на эти события в реальном времени!
 
 ---
-**Author**: Karzhaubay Sanzhar  
-**Status**: 100% Completed / Hardened / Documented
+**Автор**: Каржаубаев Санжар  
+**Статус**: 100% Завершено / Защищено / Задокументировано

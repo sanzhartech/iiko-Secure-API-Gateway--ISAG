@@ -1,35 +1,35 @@
-# Project State: iiko Secure API Gateway (ISAG)
+# Состояние проекта: iiko Secure API Gateway (ISAG)
 
-## Final Status: 100% Completed (Hardened & Documented)
-- **Phase 12 Finalized**: Admin Dashboard, Real-time Analytics, and Onboarding Wizard are fully operational.
-- **Verification**: 100% test pass rate (70/70) with 78% coverage.
-- **Security Audit**: All 9 stages of the security pipeline are active and verified.
-- **Full Synchronization**: Project fully synced and hardened (2026-05-14).
+## Текущий статус: 100% Завершено (Защищено и задокументировано)
+- **Завершение фазы 12**: Панель администратора (Admin Dashboard), аналитика в реальном времени и мастер создания клиентов полностью готовы к работе.
+- **Верификация**: 100% прохождение тестов (70/70) с уровнем покрытия 78%.
+- **Аудит безопасности**: Все 9 этапов конвейера безопасности активны и проверены.
+- **Полная синхронизация**: Проект полностью синхронизирован и защищен (14 мая 2026 г.).
 
-## Milestone Completion Summary
-| Phase | Feature | Status |
+## Сводная таблица выполнения этапов
+| Фаза | Функционал | Статус |
 | :--- | :--- | :--- |
-| **Phase 1-4** | Core Proxy, JWT RS256, Redis JTI, Routing | ✅ Done |
-| **Phase 5-6** | Observability (Prometheus/Grafana) & Docker | ✅ Done |
-| **Phase 7** | CI/CD & Final Documentation | ✅ Done |
-| **Phase 8-9** | DB Registry & Refresh Token Flow | ✅ Done |
-| **Phase 10-11** | Admin Controls & Kill-Switch | ✅ Done |
-| **Phase 12** | Admin Dashboard & Partner Hub (UI) | ✅ Done |
+| **Фазы 1-4** | Ядро прокси, JWT RS256, Redis JTI, маршрутизация | ✅ Выполнено |
+| **Фазы 5-6** | Наблюдаемость (Prometheus/Grafana) и Docker | ✅ Выполнено |
+| **Фаза 7** | Автоматизация CI/CD и итоговая документация | ✅ Выполнено |
+| **Фазы 8-9** | Реестр в БД и механизм Refresh-токенов | ✅ Выполнено |
+| **Фазы 10-11** | Функции администрирования и Kill-Switch | ✅ Выполнено |
+| **Фаза 12** | Панель администратора и Partner Hub (UI) | ✅ Выполнено |
 
-## Key Technical Metrics (2026-05-14)
-- **Test Pass Rate**: 100% (70/70 tests).
-- **Test Coverage**: 78% Overall / 88% Core Security.
-- **Latency (Overhead)**: <15ms.
-- **Security Pipeline**: 9 active stages (LIFO Middleware + Dependencies).
+## Ключевые технические показатели (14.05.2026)
+- **Успешность тестов**: 100% (70 из 70 тестов пройдены успешно).
+- **Покрытие тестами**: 78% общего кода / 88% ключевых компонентов безопасности.
+- **Вносимая задержка (overhead)**: <15 мс.
+- **Конвейер безопасности**: 9 активных этапов (LIFO Middleware + Dependencies).
 
-## Recent Additions (2026-05-14)
-- **Partner Hub**: React-based dashboard for client management and analytics.
-- **Audit Hardening**: DB-backed audit trail for admin actions and request history.
-- **Security Repair**: Fixed Docker networking for Prometheus and hardened non-root user permissions.
-- **Frontend Interceptor**: Robust 401 handling to prevent session drops.
+## Недавние улучшения (14.05.2026)
+- **Partner Hub**: Панель управления на React для администрирования клиентов и просмотра аналитики.
+- **Усиление аудита**: Журнал аудита в базе данных для фиксации действий администраторов и истории запросов.
+- **Исправление безопасности**: Корректировка сетевого взаимодействия Docker для Prometheus и ограничение прав контейнеров (non-root пользователи).
+- **Перехватчики фронтенда**: Надежный механизм обработки ошибок 401 для предотвращения сброса сессий пользователей.
 
-## Latest Verification (2026-05-14)
-- [x] Full `pytest` suite passing (70/70).
-- [x] Admin Dashboard verified: stats, kill-switch, client creation.
-- [x] Prometheus metrics verified across the full Docker cluster.
-- [x] Refresh Token rotation verified end-to-end.
+## Результаты последней проверки (14.05.2026)
+- [x] Полный набор тестов `pytest` успешно пройден (70/70).
+- [x] Панель администратора проверена: сбор статистики, Kill-Switch, создание клиентов.
+- [x] Метрики Prometheus успешно собираются со всех узлов Docker-кластера.
+- [x] Механизм обновления токенов (Refresh Token rotation) проверен сквозь все слои.

@@ -1,36 +1,36 @@
-# PROJECT_CONTEXT: ISAG Architecture & Security Philosophy
+# PROJECT_CONTEXT: Архитектурная концепция и философия безопасности ISAG
 
-The **iiko Secure API Gateway (ISAG)** is implemented as a hardened, high-performance security layer. Operating as an asynchronous reverse proxy, it serves as the single entrance gateway for third-party integrations connecting to the iiko API.
-
----
-
-## 1. Core Security Philosophies
-
-*   **Defense-in-Depth**: Security controls are stacked in multiple layers. If one layer is bypassed or misconfigured, others (e.g. rate limits, schema validation) catch and block the request.
-*   **Fail-Closed**: In any error state (such as missing environment variables, database lockout, or Redis failure), the gateway defaults to denying the request.
-*   **Zero-Trust**: Every request is verified using RS256 cryptographic signatures, client active states, and role-based permissions, irrespective of network origin.
+Приложение **iiko Secure API Gateway (ISAG)** реализовано как защищенный высокопроизводительный шлюз безопасности. Функционируя как асинхронный обратный прокси-сервер (reverse proxy), оно служит единой точкой входа для всех сторонних интеграций, подключающихся к API iiko.
 
 ---
 
-## 2. Integrated Security Pipeline (9 Stages)
+## 1. Ключевые принципы безопасности
 
-All requests traverse the following pipeline of LIFO middlewares and FastAPI routing dependencies:
-
-1.  **Transport Security (Outermost)**: `SecureHeadersMiddleware` enforces HSTS, CSP, and X-Frame-Options.
-2.  **DoS Protection**: `RequestSizeValidatorMiddleware` drops request bodies larger than 10MB immediately.
-3.  **Distributed Rate Limiting**: `SlowAPIMiddleware` limits rates per IP and client using Redis.
-4.  **CORS Origin Gating**: `CORSMiddleware` filters browser client cross-origin access.
-5.  **Audit Logging**: `AuditLogMiddleware` registers transaction correlation IDs and prepares DB logs.
-6.  **Telemetry Exporter**: `MetricsMiddleware` registers Prometheus request statistics using URL path-normalization.
-7.  **Asymmetric Verification**: `JWTValidator` verifies RS256 token signatures and checks expiration claims.
-8.  **Replay Protection**: `JTIStore` checks JWT IDs in Redis with a 2-second grace period (specifically for refresh tokens).
-9.  **RBAC Authorization**: FastAPI dependencies verify that roles and scopes match resource permissions.
-10. **Response Filtering (Innermost)**: `ResponseFilterMiddleware` sanitizes outgoing headers to prevent information disclosure.
+*   **Defense-in-Depth (Эшелонированная защита)**: Функции контроля безопасности разделены на несколько независимых слоев. Если один из слоев скомпрометирован или некорректно настроен, другие уровни (например, лимиты частоты запросов или валидация схем) перехватят и заблокируют запрос.
+*   **Fail-Closed (Блокировка при сбое)**: При возникновении любого аварийного состояния (отсутствие переменных окружения, блокировка БД, сбой Redis) шлюз по умолчанию запрещает доступ и отклоняет запрос.
+*   **Zero-Trust (Нулевое доверие)**: Каждый запрос проверяется с использованием криптографических подписей RS256, проверки активности учетной записи клиента в БД и его ролей, вне зависимости от сетевого происхождения запроса.
 
 ---
 
-## 3. Core Design Decisions
+## 2. Интегрированный конвейер безопасности (9 этапов)
 
-*   **LIFO MiddlewareStack**: Middlewares are executed in reverse registration order. This places low-overhead validations (size validator, IP rate limiter) at the outermost edge, preventing expensive database lookups on DDoS traffic.
-*   **Decoupled Secret Storage**: Upstream access tokens (`IIKO_API_KEY`) and client verification keys (`GATEWAY_CLIENT_SECRET`) are separated, preventing client credential exposures from leaking control of the upstream API.
-*   **Bcrypt & Constant-Time Mocks**: Partner registry passwords are Bcrypt-hashed. If a client ID is not found, the gateway triggers `dummy_verify()` to simulate a hashing delay, preventing timing side-channel attacks.
+Каждый запрос проходит через следующий последовательный стек промежуточного ПО (middlewares LIFO) и зависимостей маршрутизации FastAPI:
+
+1.  **Безопасность транспорта (внешний слой)**: `SecureHeadersMiddleware` внедряет заголовки HSTS, CSP и X-Frame-Options.
+2.  **Защита от DoS**: `RequestSizeValidatorMiddleware` немедленно сбрасывает тела запросов размером более 10 МБ.
+3.  **Распределенный Rate Limiting**: `SlowAPIMiddleware` накладывает ограничения по IP и по идентификатору клиента с использованием Redis.
+4.  **CORS Gating**: `CORSMiddleware` фильтрует кросс-доменные запросы браузерных клиентов.
+5.  **Логирование аудита**: `AuditLogMiddleware` генерирует ID корреляции транзакций и готовит данные для логирования в БД.
+6.  **Экспорт телеметрии**: `MetricsMiddleware` регистрирует метрики Prometheus для запросов с нормализацией путей URL.
+7.  **Асимметричная верификация**: `JWTValidator` проверяет подписи токенов RS256 и контролирует срок действия токенов (exp).
+8.  **Защита от повторных атак**: `JTIStore` проверяет уникальные идентификаторы JWT в Redis с 2-секундным льготным периодом (в основном для refresh-токенов).
+9.  **Авторизация RBAC**: Зависимости FastAPI проверяют соответствие ролей и областей доступа (scopes) запрашиваемому ресурсу.
+10. **Фильтрация ответов (самый внутренний слой)**: `ResponseFilterMiddleware` очищает исходящие заголовки во избежание раскрытия версий ПО.
+
+---
+
+## 3. Ключевые проектные решения
+
+*   **Стек LIFO для Middleware**: Промежуточное ПО выполняется в порядке, обратном регистрации. Это позволяет разместить легковесные проверки (размер запроса, IP rate limiter) на внешнем контуре, предотвращая выполнение ресурсоемких SQL-запросов к БД при DDoS-атаках.
+*   **Раздельное хранение секретов**: Ключи доступа к вышестоящему iiko API (`IIKO_API_KEY`) и секретные ключи для проверки клиентов (`GATEWAY_CLIENT_SECRET`) изолированы друг от друга, исключая утечку доступа к upstream-серверу при компрометации учетных данных клиента.
+*   **Bcrypt и симуляция времени выполнения**: Пароли в реестре партнеров хэшируются с помощью Bcrypt. Если запрашиваемый ID клиента отсутствует в базе данных, шлюз выполняет заглушку проверки `dummy_verify()` для имитации задержки вычисления хэша, предотвращая атаки по времени выполнения (timing side-channel attacks).

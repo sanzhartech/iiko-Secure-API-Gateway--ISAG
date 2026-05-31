@@ -1,25 +1,25 @@
-# ISAG — API Specification & Interface Control
+# ISAG — Спецификация API и управление интерфейсами
 
-This document defines the contract for all API endpoints exposed by the **iiko Secure API Gateway (ISAG)**.
+Этот документ определяет протокол взаимодействия (контракт) для всех эндпоинтов API, предоставляемых шлюзом **iiko Secure API Gateway (ISAG)**.
 
-All protected endpoints require an RS256-signed JWT token passed in the `Authorization: Bearer <token>` header.
+Все защищенные эндпоинты требуют передачи JWT-токена, подписанного алгоритмом RS256, в заголовке `Authorization: Bearer <token>`.
 
 ---
 
-## 1. Authentication Endpoints
+## 1. Эндпоинты аутентификации
 
-### A. Exchange Credentials for Token Pair
-*   **Method / Route**: `POST /auth/token`
-*   **Access Control**: Public (Rate Limit: 10/minute)
-*   **Description**: Exchanges partner client credentials for a JWT access token and a refresh token.
-*   **Request Schema**:
+### А. Обмен учетных данных на пару токенов
+*   **Метод / Маршрут**: `POST /auth/token`
+*   **Контроль доступа**: Публичный (Лимит: 10 запросов в минуту)
+*   **Описание**: Обменивает учетные данные партнера (Client ID и Client Secret) на пару JWT-токенов: access-токен и refresh-токен.
+*   **Схема запроса**:
     ```json
     {
-      "client_id": "string (min 3 chars, max 128)",
-      "client_secret": "string (min 8 chars, max 256)"
+      "client_id": "string (от 3 до 128 символов)",
+      "client_secret": "string (от 8 до 256 символов)"
     }
     ```
-*   **Response Schema (200 OK)**:
+*   **Схема успешного ответа (200 OK)**:
     ```json
     {
       "access_token": "eyJhbGciOiJSUzI1NiIsImtpZC...",
@@ -28,30 +28,30 @@ All protected endpoints require an RS256-signed JWT token passed in the `Authori
       "refresh_token": "eyJhbGciOiJSUzI1NiIsImtpZC..."
     }
     ```
-*   **Errors**:
-    *   `401 Unauthorized` (Invalid credentials or inactive client)
-    *   `429 Too Many Requests` (Rate limit exceeded)
+*   **Ошибки**:
+    *   `401 Unauthorized` (Неверные учетные данные или неактивный клиент)
+    *   `429 Too Many Requests` (Превышен лимит частоты запросов)
 
-### B. Renew Access Token via Refresh Token
-*   **Method / Route**: `POST /auth/refresh`
-*   **Access Control**: Public (Rate Limit: 10/minute)
-*   **Description**: Validates the refresh token (signature, expiration, `type: refresh`), performs JTI replay checks, re-verifies that the client is active in the database, and issues a new access/refresh token pair.
-*   **Request Schema**:
+### B. Обновление access-токена через refresh-токен
+*   **Метод / Маршрут**: `POST /auth/refresh`
+*   **Контроль доступа**: Публичный (Лимит: 10 запросов в минуту)
+*   **Описание**: Проверяет валидность refresh-токена (подпись, срок действия, наличие клайма `type: refresh`), выполняет проверку повторного использования JTI в Redis, повторно проверяет активность клиента в базе данных и выпускает новую пару access- и refresh-токенов.
+*   **Схема запроса**:
     ```json
     {
       "refresh_token": "eyJhbGciOiJSUzI1NiIsImtpZC..."
     }
     ```
-*   **Response Schema (200 OK)**: Same as `/auth/token`.
-*   **Errors**:
-    *   `401 Unauthorized` (Invalid token, token type mismatch, expired token, or JTI replay detected)
-    *   `429 Too Many Requests` (Rate limit exceeded)
+*   **Схема успешного ответа (200 OK)**: Аналогично `/auth/token`.
+*   **Ошибки**:
+    *   `401 Unauthorized` (Невалидный токен, неверный тип токена, истекший срок действия или обнаружен повторный запрос JTI)
+    *   `429 Too Many Requests` (Превышен лимит частоты запросов)
 
-### C. Get Current Client Profile
-*   **Method / Route**: `GET /auth/me`
-*   **Access Control**: Authenticated (Requires valid access token)
-*   **Description**: Verifies the access token and returns client details.
-*   **Response Schema (200 OK)**:
+### C. Получение профиля текущего клиента
+*   **Метод / Маршрут**: `GET /auth/me`
+*   **Контроль доступа**: Авторизованный (Требуется валидный access-токен)
+*   **Описание**: Проверяет access-токен и возвращает информацию о клиенте.
+*   **Схема успешного ответа (200 OK)**:
     ```json
     {
       "id": "partner-aggregat-1",
@@ -61,28 +61,28 @@ All protected endpoints require an RS256-signed JWT token passed in the `Authori
 
 ---
 
-## 2. Secure Proxy Services (Upstream Integration)
+## 2. Безопасные прокси-сервисы (Интеграция с Upstream)
 
-### Route Proxy Handler
-*   **Method / Route**: `[GET|POST|PUT|DELETE|PATCH] /api/{path:path}`
-*   **Access Control**: Authenticated (Access token required, role matches requested path)
-*   **Description**: Streams requests asynchronously to the upstream iiko API. Strips hop-by-hop headers, masks upstream API keys, and blocks path traversal attempts.
-*   **Security Controls**:
-    *   JWT Validation (`type: "access"`)
-    *   RBAC validation (e.g. requires `proxy:read` or `proxy:write` scopes)
-    *   Distributed Rate Limiting (IP and User limits)
-    *   Payload size ceiling (max 10MB)
+### Маршрутизатор прокси-запросов
+*   **Метод / Маршрут**: `[GET|POST|PUT|DELETE|PATCH] /api/{path:path}`
+*   **Контроль доступа**: Авторизованный (Требуется access-токен, роль должна соответствовать запрашиваемому маршруту)
+*   **Описание**: Асинхронно перенаправляет поток запроса в вышестоящее API iiko. Удаляет заголовки hop-by-hop, маскирует API-ключи upstream-сервиса и блокирует попытки обхода путей (path traversal).
+*   **Механизмы безопасности**:
+    *   Валидация JWT (обязателен клайм `type: "access"`)
+    *   Авторизация по RBAC (требуется соответствие областей доступа, например `proxy:read` или `proxy:write`)
+    *   Распределенный Rate Limiting (лимиты на IP-адрес и на пользователя)
+    *   Ограничение размера тела запроса (максимум 10 МБ)
 
 ---
 
-## 3. Administrative Management API
+## 3. Административный API управления
 
-Requires the client to have the `admin` role in their access token claims.
+Требует наличия роли `admin` в клаймах предоставляемого access-токена.
 
-### A. Get System Status & Analytics
-*   **Method / Route**: `GET /admin/stats`
-*   **Description**: Returns real-time metrics and historical logs digest for the admin dashboard.
-*   **Response Schema (200 OK)**:
+### А. Получение статистики и аналитики системы
+*   **Метод / Маршрут**: `GET /admin/stats`
+*   **Описание**: Возвращает метрики реального времени и срез исторических логов для панели администратора.
+*   **Схема успешного ответа (200 OK)**:
     ```json
     {
       "total_requests": 14205,
@@ -95,16 +95,16 @@ Requires the client to have the `admin` role in their access token claims.
     }
     ```
 
-### B. Toggle Global Emergency Kill-Switch
-*   **Method / Route**: `POST /admin/kill-switch`
-*   **Description**: Instantly toggles global blocking in Redis. When `active` is true, all non-admin proxy requests return 503.
-*   **Request Schema**:
+### B. Переключение аварийного выключателя (Kill-Switch)
+*   **Метод / Маршрут**: `POST /admin/kill-switch`
+*   **Описание**: Мгновенно изменяет состояние блокировки в Redis. Если параметр `active` равен `true`, все прокси-запросы от клиентов (за исключением администраторов) отклоняются с кодом 503.
+*   **Схема запроса**:
     ```json
     {
       "active": true
     }
     ```
-*   **Response Schema (200 OK)**:
+*   **Схема успешного ответа (200 OK)**:
     ```json
     {
       "status": "success",
@@ -112,10 +112,10 @@ Requires the client to have the `admin` role in their access token claims.
     }
     ```
 
-### C. Create New Partner Integration
-*   **Method / Route**: `POST /admin/clients`
-*   **Description**: Registers a new partner, generating a cryptographically secure client ID and password.
-*   **Request Schema**:
+### C. Регистрация нового партнера
+*   **Метод / Маршрут**: `POST /admin/clients`
+*   **Описание**: Создает новую интеграцию партнера, генерируя криптографически безопасный идентификатор клиента (Client ID) и пароль.
+*   **Схема запроса**:
     ```json
     {
       "client_id": "new-partner-delivery",
@@ -124,7 +124,7 @@ Requires the client to have the `admin` role in their access token claims.
       "rate_limit": 100
     }
     ```
-*   **Response Schema (200 OK)**:
+*   **Схема успешного ответа (200 OK)**:
     ```json
     {
       "client_id": "new-partner-delivery",
@@ -135,10 +135,10 @@ Requires the client to have the `admin` role in their access token claims.
     }
     ```
 
-### D. Get Audit Logs
-*   **Method / Route**: `GET /admin/logs`
-*   **Description**: Returns a paginated list of security audit logs.
-*   **Response Schema (200 OK)**:
+### D. Получение логов аудита
+*   **Метод / Маршрут**: `GET /admin/logs`
+*   **Описание**: Возвращает постраничный список логов аудита безопасности.
+*   **Схема успешного ответа (200 OK)**:
     ```json
     [
       {
@@ -154,18 +154,18 @@ Requires the client to have the `admin` role in their access token claims.
 
 ---
 
-## 4. System & Observability Endpoints
+## 4. Системные эндпоинты
 
-### A. Liveness Probe
-*   **Method / Route**: `GET /health`
-*   **Description**: Verifies the container process is running.
-*   **Response (200 OK)**: `{"status": "healthy"}`
+### А. Liveness Probe (Проверка жизнеспособности)
+*   **Метод / Маршрут**: `GET /health`
+*   **Описание**: Проверяет, что процесс контейнера запущен и активен.
+*   **Ответ (200 OK)**: `{"status": "healthy"}`
 
-### B. Kubernetes Readiness Probe
-*   **Method / Route**: `GET /ready`
-*   **Description**: Verifies backend connection to DB and Redis.
-*   **Response (200 OK)**: `{"status": "ready"}`
+### B. Readiness Probe (Проверка готовности)
+*   **Метод / Маршрут**: `GET /ready`
+*   **Описание**: Проверяет успешность подключения бэкенда к БД и Redis.
+*   **Ответ (200 OK)**: `{"status": "ready"}`
 
-### C. Prometheus Exporter
-*   **Method / Route**: `GET /metrics`
-*   **Description**: Exposes current gateway metrics in standard Prometheus text format. Must be accessible without JWT authentication.
+### C. Экспорт метрик Prometheus
+*   **Метод / Маршрут**: `GET /metrics`
+*   **Описание**: Экспортирует метрики шлюза в стандартном текстовом формате Prometheus. Должен быть доступен без JWT-аутентификации.

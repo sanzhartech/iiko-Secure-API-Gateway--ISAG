@@ -1,73 +1,73 @@
-# ISAG — Code Structure & Module Architecture
+# ISAG — Структура кода и архитектура модулей
 
-The **iiko Secure API Gateway (ISAG)** is built using a **modular, layered architecture** focusing on **dependency injection (DI)** and **fail-closed security principles**.
-
----
-
-## 1. Architectural Patterns
-
-### Middleware Execution Order (LIFO)
-FastAPI executes middleware in a Last-In-First-Out stack. Middlewares are registered in reverse order of request execution:
-*   **Outermost Middlewares** (First to receive requests): Execute cheap, high-volume rejections (HSTS headers, size verification, IP rate limiting) without touching the database or Redis.
-*   **Innermost Middlewares** (Last to receive requests): Handle metrics collection, auditing, and authorization filters, which require request parsing and database/Redis communication.
+Приложение **iiko Secure API Gateway (ISAG)** разрабочено на основе **модульной многослойной архитектуры** с фокусом на **внедрение зависимостей (DI)** и принцип **безопасной блокировки при сбоях (fail-closed)**.
 
 ---
 
-## 2. Core Modules Breakdown
+## 1. Архитектурные паттерны
 
-### A. Core Infrastructure (`app/core/`)
-*   **`config.py`**: Strict settings validation via `pydantic-settings`. Loads keys once on startup and caches them in memory.
-*   **`redis.py`**: Async Redis client session connection pooling.
-*   **`metrics.py`**: Prometheus metrics declarations and label normalization helpers.
-*   **`hashing.py`**: Bcrypt hashing functions and constant-time `dummy_verify()` execution.
-*   **`logging.py`**: JSON-structured logger setup for threat forensics.
-
-### B. Security & Identity Layer (`app/security/`)
-*   **`jwt_validator.py`**: Validates JWT signatures (RS256), handles Key ID (`kid`) dynamic key selection, checks expiration claims, and enforces token type constraints.
-*   **`jti_store.py`**: Stateful replay checker implementing the 2-second grace period counter.
-*   **`rbac.py`**: Role-Based Access Control logic mapping scopes to endpoint actions.
-
-### C. Database & Models Layer (`app/db/` and `app/models/`)
-*   **`db/engine.py`**: Handles SQLAlchemy 2.0 async engine configuration and session dependency creation.
-*   **`models/client.py`**: The `GatewayClient` database schema.
-*   **`models/audit.py`**: Contains `AdminAuditLog` and `GatewayRequestLog` database schemas.
-
-### D. Middlewares Stack (`app/middleware/`)
-*   **`secure_headers.py`**: Injects transport-level security headers (HSTS, CSP, X-Frame-Options).
-*   **`size_validator.py`**: Immediately drops payload streams larger than 10MB.
-*   **`rate_limiter.py`**: SlowAPI distributed rate limiting wrapper.
-*   **`metrics.py`**: Measures latency and path-normalized request counts.
-*   **`response_filter.py`**: Sanitizes outgoing headers (removes server versions).
-
-### E. API Routers (`app/api/`)
-*   **`auth.py`**: Coordinates `/auth/token`, `/auth/refresh`, and `/auth/me` endpoints.
-*   **`proxy.py`**: Orchestrates secure proxy routing `/api/{path}`.
-*   **`admin.py`**: Controls analytics, client registry updates, and the global Kill-Switch.
+### Порядок выполнения промежуточного ПО (Middleware)
+FastAPI выполняет стек промежуточного ПО (middlewares) по принципу LIFO (Last-In-First-Out — последним пришел, первым ушел). Регистрация в коде происходит в обратном порядке жизненного цикла запроса:
+*   **Внешний уровень (Outermost Middlewares)**: Принимают запросы первыми. Выполняют «дешевые» высокопроизводительные блокировки (заголовки безопасности HSTS, проверка размера тела запроса, ограничение RPS по IP-адресу) без обращения к базе данных или Redis.
+*   **Внутренний уровень (Innermost Middlewares)**: Обрабатывают запросы последними перед роутером. Отвечают за сбор метрик, аудит и фильтрацию прав доступа, что требует парсинга запроса и взаимодействия с Redis и реляционной БД.
 
 ---
 
-## 3. Request Dependency Injection Graph
+## 2. Разделение по модулям
 
-When a request is routed, FastAPI resolves dependencies in the following order:
+### A. Базовая инфраструктура (`app/core/`)
+*   **`config.py`**: Валидация настроек шлюза через `pydantic-settings`. Загружает RSA-ключи при старте в память и кэширует их.
+*   **`redis.py`**: Инициализация асинхронного пула соединений с Redis.
+*   **`metrics.py`**: Объявление метрик Prometheus и вспомогательные функции нормализации путей.
+*   **`hashing.py`**: Хэширование Bcrypt и выполнение сравнения хэшей за константное время `dummy_verify()`.
+*   **`logging.py`**: Настройка структурированного логирования в формате JSON для расследования инцидентов ИБ.
+
+### B. Слой аутентификации и безопасности (`app/security/`)
+*   **`jwt_validator.py`**: Валидация подписей JWT (RS256), динамический выбор открытого ключа по `kid`, проверка срока действия (expiration) и типов токенов.
+*   **`jti_store.py`**: Компонент защиты от повторных атак (replay protection) с состоянием в Redis и поддержкой 2-секундного льготного окна.
+*   **`rbac.py`**: Ролевая модель управления доступом, проверяющая соответствие областей видимости (scopes) и ролей запрошенному действию.
+
+### C. Слой базы данных и моделей (`app/db/` и `app/models/`)
+*   **`db/engine.py`**: Настройка асинхронного движка SQLAlchemy 2.0 и предоставление сессии БД в качестве зависимости.
+*   **`models/client.py`**: Описание SQL-схемы таблицы клиентов `GatewayClient`.
+*   **`models/audit.py`**: Описание SQL-схем таблиц логов `AdminAuditLog` и `GatewayRequestLog`.
+
+### D. Слой промежуточного ПО (`app/middleware/`)
+*   **`secure_headers.py`**: Внедрение транспортных заголовков безопасности (HSTS, CSP, X-Frame-Options).
+*   **`size_validator.py`**: Немедленное прерывание загрузки тел запросов размером более 10 МБ.
+*   **`rate_limiter.py`**: Обёртка распределенного лимитера частоты запросов SlowAPI.
+*   **`metrics.py`**: Измерение времени обработки запроса (latency) и сбор метрик с нормализацией путей.
+*   **`response_filter.py`**: Очистка исходящих заголовков от отладочной информации (удаление версии сервера Nginx/FastAPI).
+
+### E. Маршрутизация API (`app/api/`)
+*   **`auth.py`**: Обработка эндпоинтов `/auth/token`, `/auth/refresh` и `/auth/me`.
+*   **`proxy.py`**: Асинхронное безопасное проксирование запросов `/api/{path}` в iiko API.
+*   **`admin.py`**: API для аналитики, управления списком клиентов и переключения глобального Kill-Switch.
+
+---
+
+## 3. Граф внедрения зависимостей запроса
+
+При обработке входящего запроса FastAPI разрешает зависимости в следующем порядке:
 
 ```mermaid
 graph TD
-    Request[Incoming Request] --> Middleware[1. Middlewares Size, Rate Limit, Audit]
-    Middleware --> DepAuth[2. Depends get_current_claims]
-    DepAuth --> ValJWT[3. JWTValidator.validate Signature, Expiry, KID]
-    ValJWT --> CheckType{Token Type Match?}
+    Request[Входящий запрос] --> Middleware[1. Промежуточное ПО: Размер, Лимиты, Аудит]
+    Middleware --> DepAuth[2. Зависимость get_current_claims]
+    DepAuth --> ValJWT[3. JWTValidator.validate: Подпись, Срок действия, KID]
+    ValJWT --> CheckType{Тип токена совпадает?}
     
-    CheckType -- Mismatch --> Reject[HTTP 401 Unauthorized]
-    CheckType -- Refresh Token --> CheckJTI[4. JTIStore.is_replay in Redis]
-    CheckJTI -- Replayed --> Reject
+    CheckType -- Несовпадение --> Reject[HTTP 401 Unauthorized]
+    CheckType -- Refresh Token --> CheckJTI[4. JTIStore.is_replay в Redis]
+    CheckJTI -- Повторный запрос --> Reject
     
-    CheckType -- Access Token --> VerifyClient[5. client_service.get_client_by_id in DB]
-    CheckJTI -- First Use --> VerifyClient
+    CheckType -- Access Token --> VerifyClient[5. client_service.get_client_by_id в БД]
+    CheckJTI -- Первый запрос --> VerifyClient
     
-    VerifyClient -- Inactive/Missing --> Reject
-    VerifyClient -- Active --> VerifyRBAC[6. require_permissions Roles & Scopes]
+    VerifyClient -- Неактивен/Отсутствует --> Reject
+    VerifyClient -- Активен --> VerifyRBAC[6. require_permissions: Роли и Scopes]
     
-    VerifyRBAC -- Denied --> Forbidden[HTTP 403 Forbidden]
-    VerifyRBAC -- Authorized --> Proxy[7. IikoClient Streaming Request]
-    Proxy --> Filter[8. ResponseFilterMiddleware sanitizes response]
+    VerifyRBAC -- Отказано --> Forbidden[HTTP 403 Forbidden]
+    VerifyRBAC -- Разрешено --> Proxy[7. Потоковый запрос IikoClient]
+    Proxy --> Filter[8. ResponseFilterMiddleware: очистка заголовков]
 ```

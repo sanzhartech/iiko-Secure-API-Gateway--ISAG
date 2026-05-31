@@ -1,69 +1,69 @@
-# ISAG — Testing Strategy & Verification Report
+# ISAG — Стратегия тестирования и отчет о проверке качества
 
-This document details the testing framework, test coverage metrics, and validation strategy used to guarantee the reliability and security of the iiko Secure API Gateway (ISAG).
-
----
-
-## 1. Testing Methodology
-
-The verification of ISAG follows a strict **Pyramid Testing Model**, focusing heavily on integration-level and negative security testing.
-
-### Unit & Integration Testing
-*   **Suite Size**: 70 Comprehensive Automated Tests.
-*   **Tools**: `pytest`, `pytest-asyncio`, `pytest-cov`, `respx` (for HTTP transport mocking).
-*   **Key Strategies**:
-    *   **Isolation**: Tests execute using mocked Redis clients and a local SQLAlchemy SQLite memory database to eliminate external environment state dependencies.
-    *   **Upstream Interception**: The `respx` library intercepts all outgoing `httpx` connections to the simulated iiko API, verifying header insertion and stripping.
-    *   **Negative Security Testing**: Over 60% of the test suite is dedicated to malicious and malformed input scenarios, such as algorithm confusion, missing claims, expired tokens, invalid keys, and rate limit exhaustion.
-    *   **Stateful Controls Verification**: Dynamic tests verify the correctness of the global Kill-Switch, JTI grace-window limits, and SQLAlchemy audit trail recording.
+В этом документе подробно описаны архитектура тестирования, метрики покрытия кода тестами и стратегия верификации, используемые для обеспечения надежности и безопасности шлюза iiko Secure API Gateway (ISAG).
 
 ---
 
-## 2. Test Execution & Coverage Metrics
+## 1. Методология тестирования
 
-The automated test suite runs in less than 20 seconds. Below are the verified metrics from the latest execution:
+Верификация ISAG строится на основе строгой **пирамиды тестирования** (Pyramid Testing Model) с акцентом на интеграционные тесты и негативное тестирование безопасности.
 
-| Metric | Result | Status |
+### Юнит- и интеграционное тестирование
+*   **Размер тестового набора**: 70 комплексных автоматических тестов.
+*   **Инструменты**: `pytest`, `pytest-asyncio`, `pytest-cov`, `respx` (для имитации сетевого взаимодействия HTTP).
+*   **Ключевые стратегии**:
+    *   **Изоляция**: Тесты выполняются с использованием моков Redis-клиента и локальной базы данных SQLAlchemy SQLite в памяти (in-memory) для исключения влияния внешнего состояния окуржения.
+    *   **Перехват запросов upstream**: Библиотека `respx` перехватывает все исходящие соединения `httpx` к симулируемому API iiko, проверяя правильность добавления и удаления заголовков.
+    *   **Негативное тестирование безопасности**: Более 60% тестов посвящены сценариям вредоносных и некорректных входящих данных, таким как подмена алгоритмов шифрования, отсутствие обязательных клаймов, просроченные токены, невалидные ключи и превышение лимитов частоты запросов.
+    *   **Проверка динамических механизмов**: Отдельные сценарии тестируют работу глобального Kill-Switch, льготного окна повторных запросов JTI и корректность записи журналов аудита SQLAlchemy.
+
+---
+
+## 2. Запуск тестов и показатели покрытия
+
+Полный набор тестов выполняется менее чем за 20 секунд. Ниже приведены показатели последнего запуска:
+
+| Метрика | Результат | Статус |
 | :--- | :--- | :--- |
-| **Test Pass Rate** | 100% (70/70 passed) | ✅ Pass |
-| **Code Coverage (Overall)** | 76% (1045 statements) | ✅ Pass |
-| **Core Security Component Coverage** | 90%+ Average | ✅ Pass |
-| **Fail-Closed Logic** | 100% deterministic blocking | ✅ Pass |
+| **Успешность тестов** | 100% (70/70 пройдено) | ✅ Пройдено |
+| **Общее покрытие кода (Coverage)** | 76% (1045 строк кода) | ✅ Пройдено |
+| **Покрытие ключевых компонентов защиты** | В среднем >90% | ✅ Пройдено |
+| **Логика Fail-Closed** | 100% детерминированная блокировка | ✅ Пройдено |
 
-### Coverage Breakdown by Component
-*   `app/security/jwt_validator.py` — **92%** (Signature, expiry, algorithm checks)
-*   `app/security/jti_store.py` — **88%** (Replay protection grace window)
-*   `app/security/rbac.py` — **100%** (Role and permission mappings)
-*   `app/middleware/rate_limiter.py` — **100%** (SlowAPI integration)
-*   `app/middleware/secure_headers.py` — **95%** (HSTS, CSP, XSS headers)
-*   `app/middleware/size_validator.py` — **100%** (Request body size ceiling)
-
----
-
-## 3. Stress Testing & Threat Simulation
-
-The system provides two dedicated scripts to simulate traffic archetypes and stress-test the gateway's defenses under realistic loads.
-
-### A. Stress Test Engine (`scripts/stress_test.py`)
-This script simulates multi-threaded concurrent connections representing different traffic archetypes:
-1.  **`LEGIT`**: Baseline traffic using valid RS256 keys. Overhead is measured at $<15\text{ms}$.
-2.  **`NO-AUTH`**: Requests with missing or malformed headers. Verified $100\%$ blocking rate.
-3.  **`DDOS`**: High-frequency request spikes. Verified triggering of `HTTP 429 Too Many Requests`.
-4.  **`REPLAY`**: Attempts to reuse a single `jti` refresh token. Verified that second-use within 2 seconds is allowed once (grace), and third-use is blocked.
-
-### B. Live Attack Simulation Demo (`demo_attack.py` or `scripts/demo_attack.py`)
-A script designed to showcase the real-time defense response during the diploma presentation:
-*   Sends normal requests to show a green "health pulse" on the React dashboard.
-*   Sends a burst of requests to trigger rate limiting, producing a red glow in the live telemetry feed.
-*   Sends forged tokens showing immediate `UNAUTHORIZED` blocks.
+### Показатели покрытия по компонентам бэкенда
+*   `app/security/jwt_validator.py` — **92%** (проверка подписи, срока действия и алгоритмов)
+*   `app/security/jti_store.py` — **88%** (льготный период защиты от повторных атак)
+*   `app/security/rbac.py` — **100%** (сопоставление ролей и прав доступа)
+*   `app/middleware/rate_limiter.py` — **100%** (интеграция SlowAPI и Redis)
+*   `app/middleware/secure_headers.py` — **95%** (заголовки безопасности HSTS, CSP, XSS)
+*   `app/middleware/size_validator.py` — **100%** (ограничение размера тела запроса)
 
 ---
 
-## 4. CI/CD Integration
+## 3. Нагрузочное тестирование и симуляция угроз
 
-To ensure security settings are never degraded during development, the validation pipeline is automated via **GitHub Actions** on every push to the repository:
-1.  **Environment Initialization**: Spins up Python 3.12, PostgreSQL, and Redis service containers.
-2.  **Secret Mocking**: Generates temporary RSA private and public keys.
-3.  **Database Migration**: Runs SQLAlchemy migrations to create the database schemas.
-4.  **Test Suite Execution**: Runs `pytest tests/ --cov=app` to assert 100% pass rates.
-5.  **Fail-Secure Guard**: The deployment branch is blocked if any test fails or coverage drops.
+В системе предусмотрены два специализированных скрипта для симуляции различных профилей трафика и тестирования защиты шлюза под реалистичной нагрузкой.
+
+### А. Модуль нагрузочного тестирования (`scripts/stress_test.py`)
+Этот скрипт запускает многопоточные одновременные соединения, имитируя различные паттерны поведения:
+1.  **`LEGIT`**: Легитимный трафик с использованием валидных ключей RS256. Вносимая задержка шлюза составляет $<15\text{мс}$.
+2.  **`NO-AUTH`**: Запросы с отсутствующими или невалидными заголовками. Проверено 100% блокирование трафика.
+3.  **`DDOS`**: Всплески запросов с высокой частотой. Подтверждена блокировка с ответом `HTTP 429 Too Many Requests`.
+4.  **`REPLAY`**: Попытки повторного использования одного JTI refresh-токена. Подтверждено, что второе использование в течение 2 секунд разрешено (grace period), а третье — блокируется.
+
+### B. Симуляция атак в реальном времени (`demo_attack.py` или `scripts/demo_attack.py`)
+Скрипт, разработанный для демонстрации защитных возможностей шлюза во время защиты диплома:
+*   Отправляет легитимные запросы для отображения зеленого «пульса сети» на панели администратора React.
+*   Отправляет всплеск запросов для вызова rate limiting, что подсвечивает ленту событий панели управления красным светом.
+*   Отправляет поддельные токены для демонстрации мгновенной блокировки `UNAUTHORIZED`.
+
+---
+
+## 4. Интеграция CI/CD
+
+Чтобы гарантировать, что настройки безопасности не будут нарушены в процессе разработки, процесс валидации автоматизирован с помощью **GitHub Actions** при каждом коммите в репозиторий:
+1.  **Инициализация окружения**: Поднятие контейнеров с Python 3.12, PostgreSQL и Redis.
+2.  **Генерация тестовых ключей**: Автоматическое создание временных закрытого и открытого ключей RSA.
+3.  **Миграции базы данных**: Выполнение миграций SQLAlchemy для создания структуры таблиц.
+4.  **Запуск тестов**: Выполнение команды `pytest tests/ --cov=app` для подтверждения отсутствия ошибок.
+5.  **Блокировка слияния**: Запрет на слияние веток при падении любого из тестов или снижении уровня покрытия кода.

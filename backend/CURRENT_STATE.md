@@ -1,34 +1,34 @@
-# Current State: ISAG Production Milestone (May 30, 2026)
+# Текущее состояние: Промышленная версия ISAG (30 мая 2026 г.)
 
-## 1. Production-Ready Features (100% Implemented)
-*   **Asynchronous Proxy Engine**: Non-buffering streaming reverse proxy with hop-by-hop header stripping and path traversal protection.
-*   **Asymmetric JWT verification (RS256)**: Dynamic Key Rotation using Key ID (`kid`) header matching and caching to prevent disk overhead.
-*   **Token Type Separation**: Cryptographically enforced access/refresh token boundaries.
-*   **JTI Replay Protection**: Stateful Redis store with a 2-second grace period counter.
-*   **Distributed Rate Limiting**: SlowAPI integrated with Redis for IP and User-based thresholds.
-*   **DB-Backed Client Registry**: SQLAlchemy 2.0 client models with Bcrypt and timing-attack defenses.
-*   **Admin Console API**: Handles real-time telemetry extraction, audit logs pagination, client management, and the emergency Kill-Switch.
-*   **Observability Stack**: Prometheus metrics endpoint with path normalization and preconfigured Grafana dashboards.
-
----
-
-## 2. Infrastructure & DevSecOps
-*   **Dockerization**: Multi-service compose stack (Gateway, Postgres, Redis, Prometheus, Grafana, React/Nginx Frontend).
-*   **CI/CD**: GitHub Actions pipeline validating lint and executing the test suite on every commit.
-*   **Container Hardening**: Configured non-root users and read-only key mounts.
+## 1. Готовые к эксплуатации возможности (100% реализовано)
+*   **Асинхронный прокси-сервер**: Потоковый обратный прокси-сервер без буферизации с очисткой hop-by-hop заголовков и защитой от обхода путей (path traversal).
+*   **Асимметричная верификация JWT (RS256)**: Динамическая ротация ключей на основе сопоставления идентификатора `kid` в заголовке токена и кэширования для исключения дисковых задержек.
+*   **Разделение типов токенов**: Криптографически защищенные границы использования access/refresh-токенов.
+*   **Защита от повторов JTI**: Хранилище с состоянием в Redis и поддержкой 2-секундного льготного периода.
+*   **Распределенное ограничение частоты (Rate Limiting)**: Интеграция SlowAPI с Redis для настройки лимитов по IP-адресу и по идентификатору пользователя.
+*   **Реестр клиентов в БД**: Модели клиентов SQLAlchemy 2.0 с Bcrypt-шифрованием паролей и защитой от Timing-атак.
+*   **API панели администрирования**: Обработка телеметрии в реальном времени, постраничное получение логов аудита, управление клиентами и аварийный выключатель (Kill-Switch).
+*   **Стек наблюдаемости**: Эндпоинт метрик Prometheus с нормализацией путей и готовые дашборды Grafana.
 
 ---
 
-## 3. Test-Suite Execution Status
+## 2. Инфраструктура и DevSecOps
+*   **Контейнеризация**: Стек Docker Compose, состоящий из нескольких сервисов (Gateway, Postgres, Redis, Prometheus, Grafana, React/Nginx Frontend).
+*   **Интеграция CI/CD**: Сборочная линия GitHub Actions для проверки синтаксиса (lint) и запуска тестов на каждый коммит.
+*   **Усиление контейнеров**: Настройка запуска от имени пользователей без привилегий root (non-root) и монтирование ключей только для чтения.
 
-| Category | Tests | Status |
+---
+
+## 3. Результаты выполнения тестового набора
+
+| Категория тестов | Количество | Статус |
 | :--- | :--- | :--- |
-| **Security Pipeline** | 25 | ✅ 100% Pass |
-| **Auth & Tokens** | 20 | ✅ 100% Pass |
-| **Proxy & Streaming** | 15 | ✅ 100% Pass |
-| **Admin & Control** | 10 | ✅ 100% Pass |
+| **Конвейер безопасности** | 25 | ✅ Пройдено 100% |
+| **Аутентификация и токены** | 20 | ✅ Пройдено 100% |
+| **Прокси и потоки данных** | 15 | ✅ Пройдено 100% |
+| **Администрирование и контроль** | 10 | ✅ Пройдено 100% |
 
-*   **Test Pass Rate**: 100% (70/70 tests passed).
-*   **Overall Code Coverage**: 76% (1045 statements).
-*   **Core Security Coverage**: 90%+ average.
-*   **Docker Integration**: Verified database migrations, Redis connection pooling, and Prometheus scraper targets are healthy.
+*   **Успешность тестов**: 100% (успешно пройдены 70 из 70 тестов).
+*   **Общее покрытие кода**: 76% (1045 строк кода).
+*   **Покрытие ключевых компонентов безопасности**: в среднем >90%.
+*   **Интеграция в Docker**: Подтверждена работоспособность миграций БД, пулов соединений Redis и корректность сбора метрик Prometheus.

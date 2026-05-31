@@ -1,49 +1,49 @@
-Gemini.md — AI Operating & Security Architecture Guide (Hardened Edition)
+Gemini.md — Руководство по архитектуре безопасности и работе ИИ (Усиленная редакция)
 
-Project: iiko Secure API Gateway (ISAG)
-Author: Karzhaubayev Sanzhar
-Security Level: Production-Oriented
+Проект: iiko Secure API Gateway (ISAG)
+Автор: Каржаубаев Санжар
+Уровень безопасности: Промышленный (Production-Oriented)
 
-1. Architectural Philosophy
+1. Архитектурная философия
 
-The system MUST follow:
+Система ОБЯЗАНА соответствовать следующим принципам:
 
-Secure-by-Design
+Secure-by-Design (Безопасность на уровне проектирования)
 
-Defense-in-Depth
+Defense-in-Depth (Эшелонированная защита)
 
-Zero-Trust Model
+Zero-Trust Model (Модель нулевого доверия)
 
-Fail-Closed Principle
+Fail-Closed Principle (Блокировка при сбое / Безопасный отказ)
 
-Least Privilege Principle
+Least Privilege Principle (Принцип наименьших привилегий)
 
-All external traffic is considered hostile by default.
+Весь внешний трафик по умолчанию считается враждебным.
 
-2. Fixed Security Pipeline (Non-Negotiable)
+2. Фиксированный конвейер безопасности (Не подлежит изменению)
 
-All incoming requests MUST follow this order:
+Все входящие запросы ОБЯЗАНЫ проходить обработку в строго следующем порядке:
 
-TLS Termination
-→ Request Size Validation
-→ Rate Limiting
-→ JWT Validation
-→ Replay Protection
-→ RBAC Authorization
-→ Secure Proxy Forwarding
-→ Audit Logging
-→ Response Filtering
+Терминация TLS
+→ Валидация размера запроса
+→ Ограничение частоты (Rate Limiting)
+→ Валидация JWT
+→ Защита от повторных атак (Replay Protection)
+→ Авторизация RBAC
+→ Безопасное проксирование запроса (Secure Proxy Forwarding)
+→ Логирование аудита (Audit Logging)
+→ Фильтрация ответа (Response Filtering)
 
-No stage may be bypassed.
+Ни один этап не может быть пропущен.
 
-3. Cryptography & Key Management (CRITICAL)
-JWT Requirements
+3. Криптография и управление ключами (КРИТИЧЕСКИ ВАЖНО)
+Требования к JWT
 
-Algorithm: RS256 (asymmetric only)
+Алгоритм: RS256 (исключительно асимметричный)
 
-Signature verification is mandatory
+Проверка подписи является обязательной
 
-Validate:
+Валидация клаймов:
 
 exp
 
@@ -55,335 +55,336 @@ aud
 
 sub
 
-Key Management Rules
+Правила управления ключами
 
-Private keys MUST NOT be hardcoded
+Закрытые (приватные) ключи НЕ ДОЛЖНЫ быть захардкожены
 
-Keys must be loaded from secure environment or mounted secret
+Ключи должны загружаться из безопасного окружения или смонтированных секретов
 
-Support key rotation
+Поддержка ротации ключей
 
-Support multiple public keys (kid header)
+Поддержка нескольких открытых ключей (заголовок kid)
 
-Validate JWT header alg
+Валидация алгоритма (alg) в заголовке JWT
 
-Reject tokens with unexpected algorithms
+Отклонение токенов с неожиданными алгоритмами подписи
 
-Time Handling
+Обработка времени
 
-Allow configurable clock skew (≤ 60s)
+Разрешить настраиваемое расхождение времени часов (clock skew ≤ 60s)
 
-Reject expired tokens strictly
+Строго отклонять просроченные токены
 
-4. Replay Protection
+4. Защита от повторных атак (Replay Protection)
 
-Gateway MUST mitigate replay attacks:
+Шлюз ОБЯЗАН предотвращать атаки повторного использования:
 
-Require jti
+Обязательное наличие клайма jti
 
-Optional nonce tracking (in-memory or Redis)
+Опциональное отслеживание одноразовых номеров (nonce) в оперативной памяти или Redis
 
-Expire replay cache aligned with token expiration
+Время жизни кэша защиты от повторов должно быть согласовано со сроком действия токена
 
-5. Input Validation & Injection Protection
+5. Валидация входящих данных и защита от инъекций
 
-Strict Pydantic schemas
+Строгие схемы Pydantic
 
 extra = "forbid"
 
-Maximum body size limit
+Ограничение максимального размера тела запроса
 
-Content-Type validation
+Валидация заголовка Content-Type
 
-Reject malformed JSON
+Отклонение некорректного JSON
 
-Validate query parameters explicitly
+Явная валидация параметров запроса (query parameters)
 
-Prevent:
+Предотвращение:
 
-SQL injection
+SQL-инъекций
 
-Header injection
+Внедрения заголовков (Header injection)
 
-CRLF injection
+CRLF-инъекций
 
-Path traversal
+Обхода путей (Path traversal)
 
-JSON injection
+JSON-инъекций
 
-6. Rate Limiting & Abuse Protection
+6. Ограничение частоты запросов и защита от злоупотреблений
 
-Must implement:
+Обязательная реализация:
 
-Per-IP rate limits
+Лимиты частоты на уровне IP-адресов
 
-Per-user rate limits
+Лимиты частоты на уровне пользователей/клиентов
 
-Burst + sustained model
+Модель burst + sustained (пиковая + постоянная нагрузка)
 
-Return HTTP 429
+Возврат статус-кода HTTP 429
 
-Memory-safe implementation
+Безопасная с точки зрения памяти реализация
 
-No unbounded dictionaries
+Запрет на использование неограниченных словарей (unbounded dictionaries)
 
-Optional:
+Дополнительно:
 
-Sliding window algorithm
+Алгоритм скользящего окна (sliding window)
 
-Redis-backed limiter (production mode)
+Лимитер на базе Redis (для промышленного режима)
 
-7. Secure Proxy Hardening
+7. Безопасность и ужесточение проксирования (Secure Proxy Hardening)
 
-Proxy layer MUST:
+Слой проксирования ОБЯЗАН:
 
-Strip hop-by-hop headers
+Удалять заголовки hop-by-hop
 
-Remove client-supplied X-Forwarded-* headers
+Удалять предоставленные клиентом заголовки X-Forwarded-*
 
-Reconstruct forwarding headers internally
+Воссоздавать заголовки перенаправления внутри шлюза
 
-Enforce upstream timeout
+Применять таймаут при обращении к вышестоящему сервису (upstream timeout)
 
-Limit max response size
+Ограничивать максимальный размер ответа
 
-Disable automatic redirects
+Отключать автоматическое перенаправление (redirects)
 
-Prevent SSRF (whitelist upstream hosts)
+Предотвращать SSRF-атаки (белый список хостов upstream)
 
-Use connection pooling
+Использовать пул соединений (connection pooling)
 
-8. Transport & Headers Security
+8. Безопасность транспорта и заголовков
 
-Gateway MUST enforce:
+Шлюз ОБЯЗАН обеспечивать:
 
-HTTPS only
+Использование только HTTPS
 
-HSTS
+Поддержку HSTS
 
 X-Frame-Options: DENY
 
 X-Content-Type-Options: nosniff
 
-Strict CSP
+Строгую политику CSP (Content Security Policy)
 
 Referrer-Policy
 
-Minimal CORS policy (explicit origin allowlist)
+Минималистичную CORS-политику (явный белый список разрешенных источников)
 
-Never use:
+Никогда не использовать:
 
-CORS "*"
+CORS со значением "*"
 
-Credentials with wildcard origins
+Передачу учетных данных (credentials) с CORS-источниками типа "*" (дикая карта)
 
-9. Configuration Security
+9. Безопасность конфигурации
 
-Use pydantic-settings
+Использование pydantic-settings
 
-Fail startup if required env variables missing
+Остановка запуска при отсутствии обязательных переменных окружения
 
-Validate configuration types
+Валидация типов параметров конфигурации
 
-No default insecure fallback values
+Отсутствие небезопасных дефолтных значений по умолчанию
 
-Separate dev and prod configs
+Разделение конфигураций для разработки (dev) и продакшена (prod)
 
-Required config validation:
+Обязательная валидация конфигурации:
 
-JWT issuer
+JWT issuer (издатель токена)
 
-JWT audience
+JWT audience (получатель токена)
 
-Public key path
+Путь к открытому ключу (public key path)
 
-Rate limits
+Лимиты частоты запросов (rate limits)
 
-Upstream base URL
+Базовый URL вышестоящего сервиса (upstream base URL)
 
-10. Error Handling Model
+10. Модель обработки ошибок
 
-Gateway MUST:
+Шлюз ОБЯЗАН:
 
-Never expose stack traces
+Никогда не раскрывать стек трассировки ошибок (stack traces) клиенту
 
-Never expose internal file paths
+Никогда не раскрывать внутренние пути к файлам
 
-Use unified error schema
+Использовать унифицированную схему ошибок
 
-Log detailed internal error
+Подробно логировать внутренние детали ошибки
 
-Return sanitized client response
+Возвращать клиенту очищенный, безопасный ответ
 
-Example structure:
+Пример структуры ответа:
 
 {
   "error": "unauthorized",
   "message": "Invalid token",
   "request_id": "uuid"
 }
-11. Logging & Observability
 
-Logging MUST be:
+11. Логирование и наблюдаемость
 
-Structured (JSON preferred)
+Логирование ОБЯЗАНО быть:
 
-With request_id
+Структурированным (предпочтительно JSON)
 
-With user_id (if available)
+Содержать request_id
 
-Without secrets
+Содержать user_id (если доступен)
 
-Without full JWT tokens
+Не содержать секретов
 
-Mask:
+Не содержать полные токены JWT
 
-Authorization headers
+Маскировать:
 
-Tokens
+Заголовки авторизации (Authorization headers)
 
-API keys
+Токены
 
-Observability Requirements:
+API-ключи
 
-/health endpoint
+Требования к наблюдаемости:
 
-/ready endpoint
+Эндпоинт `/health`
 
-Metrics-compatible structure
+Эндпоинт `/ready`
 
-Correlation ID propagation
+Совместимая с метриками структура данных
 
-12. DoS & Resource Protection
+Распространение Correlation ID
 
-Gateway MUST implement:
+12. Защита от DoS и исчерпания ресурсов
 
-Max request body size
+Шлюз ОБЯЗАН реализовать:
 
-Upstream timeout
+Максимальный размер тела запроса
 
-Connection timeout
+Таймаут обращения к вышестоящему серверу
 
-Idle connection timeout
+Таймаут соединения (connection timeout)
 
-Concurrency limits
+Таймаут простоя (idle connection timeout)
 
-Protection against large payload attacks
+Ограничения на количество конкурентных соединений
 
-Fail fast under overload.
+Защиту от атак с использованием сверхбольших нагрузок (large payloads)
 
-13. Threat Awareness Model
+Быстрый отказ (fail fast) при перегрузке.
 
-AI-generated code must consider:
+13. Модель осведомленности об угрозах
 
-JWT forgery
+Код, генерируемый ИИ, обязан учитывать риски:
 
-Key confusion attack
+Подделки JWT
 
-Replay attack
+Атак смешивания ключей (Key confusion attack)
 
-Brute force
+Повторных атак (Replay attacks)
 
-Rate abuse
+Брутфорса / подбора паролей
 
-Header spoofing
+Злоупотребления лимитами запросов
 
-SSRF
+Подмены заголовков (Header spoofing)
 
-Injection attacks
+Атак SSRF
 
-Misconfigured CORS
+Атак инъекций (SQL, Path Traversal и др.)
 
-Resource exhaustion
+Неверной настройки CORS
 
-Insecure defaults
+Исчерпания системных ресурсов
 
-Security must fail closed.
+Небезопасных настроек по умолчанию
 
-14. Code Quality Standards
+Система безопасности должна переходить в заблокированное состояние при сбоях (fail closed).
 
-All generated code MUST:
+14. Стандарты качества кода
 
-Follow PEP 8
+Весь сгенерированный код ОБЯЗАН:
 
-Include type hints
+Соответствовать стандарту PEP 8
 
-Include docstrings
+Содержать аннотации типов (type hints)
 
-Use dependency injection
+Содержать строки документации (docstrings)
 
-Avoid global mutable state
+Использовать внедрение зависимостей (dependency injection)
 
-Use structured logging
+Избегать глобального изменяемого состояния
 
-Include security comments where relevant
+Использовать структурированное логирование
 
-No pseudocode allowed.
+Включать комментарии, описывающие механизмы безопасности
 
-15. Testing Requirements (Mandatory)
+Использование псевдокода категорически запрещено.
 
-For every feature generate:
+15. Требования к тестированию (Обязательно)
 
-Unit tests (pytest)
+Для каждой новой функции генерировать:
 
-Negative tests
+Юнит-тесты (pytest)
 
-Expired token test
+Негативные тесты
 
-Invalid signature test
+Тест с просроченным токеном
 
-Missing claim test
+Тест с невалидной подписью токена
 
-Rate limit exceed test
+Тест с отсутствующими клаймами
 
-Permission denied test
+Тест на превышение лимитов частоты запросов
 
-Tests must be runnable and realistic.
+Тест на отклонение прав доступа (permission denied)
 
-16. Production Hardening Expectations
+Тесты должны быть работоспособными и реалистичными.
 
-Gateway must assume:
+16. Ожидания от продакшен-окружения
 
-Hostile traffic
+Шлюз должен предполагать наличие:
 
-Automated scanning
+Враждебного трафика
 
-Brute-force attempts
+Автоматического сканирования уязвимостей
 
-Credential stuffing attempts
+Попыток брутфорса
 
-Misconfigured clients
+Атак подбора учетных данных (credential stuffing)
 
-Malformed requests
+Некорректно настроенных клиентов
 
-Security logic must be deterministic and strict.
+Сформированных со злоумышленным умыслом запросов
 
-17. Definition of High-Quality
+Логика безопасности должна быть строго детерминированной.
 
-Code is high-quality only if:
+17. Определение высокого качества
 
-Secure
+Код считается высококачественным только если он:
 
-Modular
+Безопасен
 
-Testable
+Модулен
 
-Observability-ready
+Покрыт тестами
 
-Production-realistic
+Готов к мониторингу и логированию (observability-ready)
 
-Follows layered architecture
+Реалистичен для продакшена
 
-Enforces security pipeline strictly
+Соответствует многослойной архитектуре
 
-18. AI Operational Rule
+Строго следует конвейеру безопасности
 
-If uncertain:
+18. Операционное правило ИИ
 
-State assumptions
+В случае неопределенности:
 
-Ask clarifying questions
+Сформулируйте ваши предположения
 
-Default to safest configuration
+Задайте уточняющие вопросы пользователю
 
-Never relax security silently.
+Используйте наиболее безопасную конфигурацию по умолчанию
+
+Никогда не ослабляйте правила безопасности неявно.

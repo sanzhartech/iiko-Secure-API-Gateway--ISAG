@@ -1,60 +1,60 @@
-# ISAG — Security Controls & Specifications
+# ISAG — Механизмы безопасности и технические спецификации
 
-This document outlines the security architecture, threat model, and technical controls implemented in the **iiko Secure API Gateway (ISAG)** to ensure a Zero-Trust environment.
-
----
-
-## 1. Cryptographic Authentication & Authorization
-
-ISAG uses JSON Web Tokens (JWT) signed with the asymmetric **RS256** algorithm. Symmetric signing algorithms (like HS256) or unsigned tokens (`alg: none`) are strictly rejected.
-
-### Key Rotation & Key ID (KID)
-*   **Decoupled Verification**: The gateway checks the JOSE header of incoming tokens for the `kid` (Key ID) parameter.
-*   **Key Store mapping**: It retrieves the corresponding public key from `keys/public_keys.json`.
-*   **Zero-Downtime Rotation**: New public keys can be appended to the JSON registry. The authorization endpoint can immediately begin issuing tokens signed with the new key while older active tokens continue to validate against their corresponding key until expiration.
-
-### Token Type Separation
-To prevent privilege escalation, ISAG enforces strict separation between token types via the custom `type` claim:
-*   **Access Token**: Carry `type: "access"` and client roles. Accepted only at `/api/*` proxies. Rejection occurs if presented to `/auth/refresh`.
-*   **Refresh Token**: Carry `type: "refresh"` and omit roles. Valid only at `/auth/refresh` for rotation. Rejected if presented to `/api/*` proxies.
+В этом документе описаны архитектура безопасности, модель угроз и технические меры защиты, реализованные в шлюзе **iiko Secure API Gateway (ISAG)** для обеспечения среды нулевого доверия (Zero-Trust).
 
 ---
 
-## 2. Stateful Replay Protection (JTI Store)
+## 1. Криптографическая аутентификация и авторизация
 
-ISAG mitigates token capture attacks using stateful Redis-backed JWT ID (`jti`) blacklisting.
+ISAG использует токены JSON Web Tokens (JWT), подписанные с помощью асимметричного алгоритма **RS256**. Симметричные алгоритмы подписи (такие как HS256) или неподписанные токены (`alg: none`) строго отклоняются.
 
-*   **Atomic SET NX**: During a token exchange, the token's `jti` is stored in Redis using an atomic `SET key timestamp NX EX expiry` command. If the key exists, the request is flagged as a potential replay.
-*   **Grace Window (Parallel Races)**: To handle legitimate browser double-requests or retry packets on slow connections, ISAG allows a configurable 2-second grace period. The first duplicate request increments a grace key (`isag:jti:grace:{jti}`). Any subsequent reuse, or reuse outside the 2-second window, triggers an immediate `HTTP 401 Unauthorized` block.
+### Ротация ключей и идентификатор ключа (KID)
+*   **Независимая проверка**: Шлюз проверяет заголовок JOSE входящих токенов на наличие параметра `kid` (Key ID).
+*   **Сопоставление с хранилищем ключей**: Соответствующий открытый ключ извлекается из реестра `keys/public_keys.json`.
+*   **Бесперебойная ротация**: Новые открытые ключи могут быть добавлены в JSON-реестр. Эндпоинт авторизации может немедленно начать выпуск токенов, подписанных новым ключом, в то время как более старые активные токены продолжают проверяться с помощью их соответствующего ключа до истечения срока их действия.
 
----
-
-## 3. Input Validation & Injection Mitigation
-
-*   **Pydantic Schema Validation**: All incoming requests are validated against strict Pydantic schemas. Schemas use `model_config = ConfigDict(extra="forbid")` to block undeclared payload parameters.
-*   **Payload Size Ceiling**: To prevent buffer exhaustion and resource denial-of-service (DoS) attacks, the outermost middleware (`RequestSizeValidatorMiddleware`) rejects any payload larger than **10MB** immediately before parsing.
-*   **Injection Protections**: FastAPI's type checks and SQLAlchemy's parameterized queries prevent SQL injection, path traversal, and JSON injection attacks.
-
----
-
-## 4. Abuse Protection & Admin Controls
-
-### Rate Limiting
-ISAG uses a distributed rate-limiter backed by Redis:
-*   **IP-Based Limiting**: Tracks requests by remote IP (`RATE_LIMIT_PER_IP` defaults to `100/minute`).
-*   **User-Based Limiting**: Tracks requests by client ID (`RATE_LIMIT_PER_USER` defaults to `50/minute`) once the JWT signature is verified.
-*   **Auth Endpoint Throttling**: The `/auth/token` and `/auth/refresh` endpoints are capped at `10/minute` to mitigate brute-force and credential-stuffing attacks.
-
-### Global Kill-Switch
-*   Administrators can toggle a global emergency shutdown via `POST /admin/kill-switch`.
-*   When active, a `global_deny` key is set in Redis. The gateway immediately fails-closed, rejecting all non-admin proxy requests with an `HTTP 503 Service Unavailable` response.
+### Разделение типов токенов
+Для предотвращения эскалации привилегий ISAG строго разграничивает типы токенов с помощью кастомного клайма `type` в JWT:
+*   **Access Token (Токен доступа)**: Содержит клайм `type: "access"` и роли клиента. Принимается только для проксируемых маршрутов `/api/*`. При отправке на эндпоинт `/auth/refresh` отклоняется.
+*   **Refresh Token (Токен обновления)**: Содержит клайм `type: "refresh"` и не содержит ролей. Действителен только на эндпоинте `/auth/refresh` для обновления пары токенов. При отправке на проксируемые маршруты `/api/*` отклоняется.
 
 ---
 
-## 5. Security Audit Logging
+## 2. Защита от повторных атак (JTI Store)
 
-All security-sensitive operations are captured by the database-backed logging engine:
-*   **Correlation IDs**: Every request is assigned a unique `X-Request-ID` UUID header to trace actions through the system.
-*   **Admin Logs**: Tracks actions (e.g. client creation, status toggles, secret rotation) with timestamp, administrator ID, target ID, and client IP.
-*   **Request Logs**: Tracks client request latency, status code, and timestamp for real-time security telemetry.
-*   **Credential Masking**: Sensitive headers, JWT tokens, and client secrets are stripped or masked before writing logs to prevent credential leakage.
+ISAG защищает систему от перехвата и повторного использования токенов с помощью отслеживания уникальных идентификаторов JWT (`jti`) в Redis.
+
+*   **Атомарная команда SET NX**: При обмене/обновлении токена его `jti` сохраняется в Redis с помощью атомарной команды `SET key timestamp NX EX expiry`. Если такой ключ уже существует, запрос помечается как потенциальная попытка повторной отправки (replay attack).
+*   **Льготный период (Grace Window)**: Для обработки легитимных двойных запросов браузера или повторных сетевых пакетов на медленных соединениях ISAG поддерживает настраиваемый 2-секундный льготный период. Первый дублирующий запрос увеличивает значение счетчика льготного ключа (`isag:jti:grace:{jti}`). Любое последующее повторное использование или повторное использование по истечении 2-секундного окна приводит к немедленной блокировке с ответом `HTTP 401 Unauthorized`.
+
+---
+
+## 3. Валидация входных данных и предотвращение инъекций
+
+*   **Валидация схем Pydantic**: Все входящие запросы проверяются на соответствие строгим схемам Pydantic. Схемы используют параметр `model_config = ConfigDict(extra="forbid")` для блокировки любых необъявленных полей в теле запроса.
+*   **Ограничение размера тела запроса**: Чтобы предотвратить переполнение буфера и атаки типа «отказ в обслуживании» (DoS), самое внешнее промежуточное ПО (`RequestSizeValidatorMiddleware`) немедленно отклоняет любые тела запросов размером более **10 МБ** еще до начала их парсинга.
+*   **Предотвращение инъекций**: Строгая проверка типов в FastAPI и параметризованные запросы SQLAlchemy полностью исключают возможность проведения атак типа SQL-инъекций, обхода путей (path traversal) и JSON-инъекций.
+
+---
+
+## 4. Защита от злоупотреблений и административный контроль
+
+### Ограничение частоты запросов (Rate Limiting)
+ISAG использует распределенный rate-limiter с кэшем в Redis:
+*   **Ограничение по IP**: Отслеживает запросы по удаленному IP-адресу клиента (`RATE_LIMIT_PER_IP` по умолчанию равен `100/minute`).
+*   **Ограничение по пользователям**: Отслеживает запросы по идентификатору клиента (`RATE_LIMIT_PER_USER` по умолчанию равен `50/minute`) после успешной проверки подписи JWT.
+*   **Защита эндпоинтов авторизации**: Эндпоинты `/auth/token` и `/auth/refresh` ограничены лимитом `10/minute` для предотвращения брутфорса и подбора учетных данных (credential stuffing).
+
+### Глобальный Kill-Switch (Аварийный выключатель)
+*   Администраторы могут активировать глобальный режим экстренного отключения с помощью запроса `POST /admin/kill-switch`.
+*   При его активации в Redis устанавливается ключ `global_deny`. Шлюз мгновенно блокирует все входящие неадминистративные прокси-запросы, возвращая ответ `HTTP 503 Service Unavailable`.
+
+---
+
+## 5. Аудит и логирование безопасности
+
+Все важные с точки зрения безопасности операции фиксируются в базе данных системой логирования аудита:
+*   **Идентификаторы корреляции**: Каждому запросу присваивается уникальный UUID-заголовок `X-Request-ID` для отслеживания цепочки действий в системе.
+*   **Логи администрирования**: Отслеживают действия администраторов (например, создание клиентов, изменение статусов, ротацию секретов) с указанием времени, ID администратора, целевого ID и IP-адреса.
+*   **Логи запросов**: Фиксируют задержку обработки запросов клиентов, статус-коды ответов и время для сбора телеметрии безопасности в реальном времени.
+*   **Маскирование учетных данных**: Чувствительные заголовки, JWT-токены и секреты клиентов вырезаются или маскируются перед записью в логи, предотвращая утечку конфиденциальной информации.

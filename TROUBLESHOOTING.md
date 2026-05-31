@@ -1,86 +1,86 @@
-# ISAG — Troubleshooting Manual
+# ISAG — Руководство по устранению неполадок
 
-This guide lists common operational issues, diagnostics workflows, and recovery steps for the **iiko Secure API Gateway (ISAG)**.
+В этом руководстве перечислены типичные операционные проблемы, методы их диагностики и шаги по восстановлению работоспособности шлюза **iiko Secure API Gateway (ISAG)**.
 
 ---
 
-## 1. Startup Failures
+## 1. Ошибки при запуске приложения
 
-### A. FileNotFoundError: private.pem or public_keys.json
-*   **Symptom**: The backend container crashes on startup with a stack trace ending in `FileNotFoundError: [Errno 2] No such file or directory: 'keys/private.pem'`.
-*   **Root Cause**: The RSA key generator has not been run, or the `keys` folder was not successfully mounted.
-*   **Remediation**:
-    1.  Ensure you have run the key generator:
+### А. FileNotFoundError: private.pem или public_keys.json
+*   **Симптом**: Контейнер бэкенда аварийно завершает работу при старте с ошибкой `FileNotFoundError: [Errno 2] No such file or directory: 'keys/private.pem'`.
+*   **Причина**: Не был запущен скрипт генерации RSA-ключей либо папка `keys` не была успешно смонтирована в контейнер.
+*   **Решение**:
+    1.  Убедитесь, что вы запустили генератор ключей:
         ```bash
         python scripts/generate_keys.py
         ```
-    2.  Check that the files exist in the `backend/keys` directory.
-    3.  In Docker environment, ensure the keys volume mount is mapped as read-only:
+    2.  Проверьте наличие созданных файлов в директории `backend/keys`.
+    3.  При использовании Docker убедитесь, что монтирование тома с ключами настроено в режиме "только для чтения":
         ```yaml
         volumes:
           - ./backend/keys:/app/keys:ro
         ```
 
-### B. ValidationError: IIKO_API_KEY and GATEWAY_CLIENT_SECRET must be different
-*   **Symptom**: The backend container fails to start with:
+### Б. ValidationError: IIKO_API_KEY и GATEWAY_CLIENT_SECRET должны различаться
+*   **Симптом**: Контейнер бэкенда не запускается с ошибкой:
     `ValueError: IIKO_API_KEY and GATEWAY_CLIENT_SECRET must be different secrets.`
-*   **Root Cause**: You copied the iiko API key value into the gateway client secret field in your `.env` or `docker-compose.yml` file.
-*   **Remediation**: Generate a separate 32-character token for the gateway client secret:
+*   **Причина**: Значение ключа iiko API было скопировано в поле секретного ключа клиента шлюза в файле `.env` или `docker-compose.yml`.
+*   **Решение**: Сгенерируйте отдельный случайный 32-символьный токен для секрета клиента шлюза:
     ```bash
     python -c "import secrets; print(secrets.token_urlsafe(32))"
     ```
-    Paste this value into `GATEWAY_CLIENT_SECRET` in your configuration, keeping it distinct from `IIKO_API_KEY`.
+    Вставьте полученное значение в переменную `GATEWAY_CLIENT_SECRET` в конфигурации, убедившись, что оно отличается от значения `IIKO_API_KEY`.
 
 ---
 
-## 2. Integration & Runtime Issues
+## 2. Проблемы интеграции и времени выполнения
 
-### A. Redis Connection Errors
-*   **Symptom**: Backend requests fail with `redis.exceptions.ConnectionError: Error connecting to localhost:6379`.
-*   **Root Cause**: The gateway is attempting to reach Redis but the server is down or the URL is misconfigured.
-*   **Remediation**:
-    *   **Docker Deployment**: Verify that the `REDIS_URL` in `docker-compose.yml` points to the container name: `redis://redis:6379/0` (not `localhost`).
-    *   **Manual Deployment**: Ensure the local Redis service is active:
+### А. Ошибки подключения к Redis
+*   **Симптом**: Запросы бэкенда падают с ошибкой `redis.exceptions.ConnectionError: Error connecting to localhost:6379`.
+*   **Причина**: Шлюз пытается подключиться к Redis, но сервер Redis не запущен или адрес указан неверно.
+*   **Решение**:
+    *   **При развертывании в Docker**: Убедитесь, что переменная `REDIS_URL` в `docker-compose.yml` указывает на имя контейнера: `redis://redis:6379/0` (а не `localhost`).
+    *   **При ручном запуске**: Убедитесь, что локальная служба Redis запущена на хосте:
         ```bash
-        # Windows Powershell check
+        # Проверка в Windows PowerShell
         Get-Service -Name *redis*
-        # Start if stopped
+        # Запуск службы, если она остановлена
         Start-Service -Name redis
         ```
 
-### B. SQLite Database Locking Errors
-*   **Symptom**: Logs show `sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked`.
-*   **Root Cause**: SQLite lacks high concurrency write capability. When multiple processes write to `gateway.db` concurrently, lockouts occur.
-*   **Remediation**:
-    1.  In development, reduce write loads or delete `gateway.db` and reload the server to recreate a clean state.
-    2.  For production, transition to PostgreSQL by setting the `DATABASE_URL` environment variable:
+### Б. Блокировки базы данных SQLite
+*   **Симптом**: В логах появляется ошибка `sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked`.
+*   **Причина**: SQLite не поддерживает высококонкурентную запись. При одновременной записи нескольких процессов в файл `gateway.db` происходят блокировки.
+*   **Решение**:
+    1.  В среде разработки снизьте интенсивность операций записи или удалите файл `gateway.db` и перезапустите сервер для пересоздания базы данных с нуля.
+    2.  Для промышленной эксплуатации (production) перейдите на СУБД PostgreSQL, настроив переменную окуржения `DATABASE_URL`:
         ```env
         DATABASE_URL=postgresql+asyncpg://isag_admin:isag_secure_password@db:5432/isag_db
         ```
 
-### C. Persistent 401 Unauthorized for Valid Tokens
-*   **Symptom**: Client requests return `HTTP 401 Unauthorized` even though the token signature is mathematically valid.
-*   **Root Cause 1: Expired Token**: The token's `exp` timestamp is in the past. Remember access tokens expire in 15 minutes.
-*   **Root Cause 2: Clock Skew**: The server clock and client clock differ by more than `60` seconds. Check server time drift.
-*   **Root Cause 3: KID mismatch**: The token JOSE header carries a `kid` that does not match any entry in the public keys JSON registry.
-*   **Remediation**:
-    1.  Check the token details using a debugger (e.g. `jwt.io`) to verify expiration, issuer, audience, and type claims.
-    2.  Synchronize host clocks using NTP.
-    3.  Verify that `keys/public_keys.json` contains the `kid` specified in the token header.
+### В. Постоянная ошибка 401 Unauthorized для валидных токенов
+*   **Симптом**: Запросы клиентов возвращают `HTTP 401 Unauthorized`, хотя криптографическая подпись токена математически верна.
+*   **Причина 1: Истек срок действия токена**: Временная метка `exp` в JWT находится в прошлом (помните, что access-токены живут 15 минут).
+*   **Причина 2: Расхождение часов (Clock Skew)**: Время на сервере шлюза и на клиенте расходится более чем на `60` секунд. Проверьте рассинхронизацию времени.
+*   **Причина 3: Несовпадение KID**: Заголовок JOSE токена содержит `kid` (Key ID), который отсутствует в реестре открытых ключей JSON.
+*   **Решение**:
+    1.  Проверьте декодированное содержимое токена с помощью отладчика (например, на `jwt.io`), обратив внимание на клаймы срока действия (`exp`), издателя (`iss`), аудитории (`aud`) и типа (`type`).
+    2.  Синхронизируйте системное время на сервере и клиенте по протоколу NTP.
+    3.  Убедитесь, что файл `keys/public_keys.json` содержит ключ с идентификатором `kid`, указанным в заголовке токена.
 
 ---
 
-## 3. Observability & Telemetry Problems
+## 3. Проблемы с системами мониторинга и телеметрии
 
-### A. Prometheus displays 0 metrics or is missing labels
-*   **Symptom**: Prometheus scraper page shows `server returned HTTP status 404` or the metrics are empty.
-*   **Root Cause**: The metrics middleware is bypassed or Prometheus cannot reach the `/metrics` route.
-*   **Remediation**:
-    1.  Verify `/metrics` responds locally:
+### А. В Prometheus не отображаются метрики или отсутствуют метки (labels)
+*   **Симптом**: На странице мониторинга Prometheus отображается статус `server returned HTTP status 404` или метрики пустые.
+*   **Причина**: Промежуточное ПО (middleware) сбора метрик отключено или Prometheus не может получить доступ к маршруту `/metrics`.
+*   **Решение**:
+    1.  Проверьте доступность маршрута `/metrics` локально:
         ```bash
         curl http://localhost:8000/metrics
         ```
-    2.  Verify the Prometheus scrape config matches the container name and port:
+    2.  Убедитесь, что конфигурация сбора Prometheus (`prometheus.yml`) ссылается на правильное имя контейнера и порт бэкенда:
         ```yaml
         scrape_configs:
           - job_name: 'isag-gateway'
@@ -89,9 +89,9 @@ This guide lists common operational issues, diagnostics workflows, and recovery 
               - targets: ['backend:8000']
         ```
 
-### B. Grafana dashboards fail to load or show no data
-*   **Symptom**: Grafana opens but panels show "No Data" or errors.
-*   **Root Cause**: The Prometheus data source is configured incorrectly or Grafana dashboard json is missing.
-*   **Remediation**:
-    1.  Navigate to **Connections -> Data Sources** in Grafana and test the Prometheus connection. It should point to `http://prometheus:9090`.
-    2.  Ensure files in `./infrastructure/grafana/provisioning/` are properly mounted into the container.
+### Б. Дашборды Grafana не загружаются или не показывают данные
+*   **Симптом**: Веб-интерфейс Grafana открывается, но панели отображают ошибку или надпись "No Data".
+*   **Причина**: Источник данных Prometheus настроен неверно или отсутствует JSON-файл конфигурации дашборда Grafana.
+*   **Решение**:
+    1.  Перейдите в Grafana в раздел **Connections -> Data Sources** и протестируйте соединение с Prometheus. Оно должно укавать на адрес `http://prometheus:9090`.
+    2.  Убедитесь, что файлы в каталоге `./infrastructure/grafana/provisioning/` корректно смонтированы в соответствующий контейнер Docker.
