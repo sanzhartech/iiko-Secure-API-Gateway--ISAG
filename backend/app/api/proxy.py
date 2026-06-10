@@ -10,6 +10,7 @@ from starlette.responses import StreamingResponse
 
 import redis.asyncio as redis
 from app.core.redis import get_redis
+from app.core.kill_switch import is_globally_blocked
 
 from app.core.logging import get_logger
 from app.middleware.rate_limiter import limiter
@@ -19,6 +20,19 @@ from app.services.iiko_client import IikoClient, _STRIP_RESPONSE_HEADERS
 
 router = APIRouter(prefix="/api", tags=["iiko Proxy"])
 logger = get_logger(__name__)
+
+
+async def enforce_not_blocked(
+    request: Request,
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
+) -> None:
+    """[B3] Dependency: reject proxy traffic with 403 while the kill-switch is on."""
+    if await is_globally_blocked(redis_client):
+        logger.warning("proxy_blocked_by_kill_switch", path=request.url.path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System is under global lockdown.",
+        )
 
 # Ensure forward references inside TokenClaims are resolved after all
 # modules have been imported (needed when from __future__ import annotations is active).
@@ -120,14 +134,8 @@ async def proxy_read(
         Depends(require_permissions(Permission.PROXY_READ)),
     ],
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
-    redis_client: Annotated[redis.Redis, Depends(get_redis)],
+    _not_blocked: Annotated[None, Depends(enforce_not_blocked)],
 ) -> Response:
-    if await redis_client.get("isag:global_block") == "1":
-        logger.warning("proxy_blocked_by_kill_switch", path=path, user_id=claims.sub)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="System is under global lockdown."
-        )
     return await _forward(request, path, claims, iiko_client)
 
 
@@ -152,12 +160,6 @@ async def proxy_write(
         Depends(require_permissions(Permission.PROXY_WRITE)),
     ],
     iiko_client: Annotated[IikoClient, Depends(get_iiko_client)],
-    redis_client: Annotated[redis.Redis, Depends(get_redis)],
+    _not_blocked: Annotated[None, Depends(enforce_not_blocked)],
 ) -> Response:
-    if await redis_client.get("isag:global_block") == "1":
-        logger.warning("proxy_blocked_by_kill_switch", path=path, user_id=claims.sub)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="System is under global lockdown."
-        )
     return await _forward(request, path, claims, iiko_client)

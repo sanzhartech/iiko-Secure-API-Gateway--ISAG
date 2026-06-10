@@ -235,6 +235,15 @@ class Settings(BaseSettings):
                 "credential coupling vulnerability."
             )
 
+        # [A3] Credentialed CORS must never be combined with a wildcard origin.
+        # Browsers forbid it and it would expose authenticated responses to any
+        # site. Enforced in all environments.
+        if self.cors_allow_credentials and "*" in self.cors_origins_list:
+            raise ValueError(
+                "CORS_ALLOW_CREDENTIALS=true cannot be combined with a wildcard "
+                "'*' origin. Specify explicit origins in CORS_ALLOWED_ORIGINS."
+            )
+
         if self.app_env == "production":
             if not self.iiko_api_base_url.startswith("https://"):
                 raise ValueError("IIKO_API_BASE_URL must use HTTPS in production")

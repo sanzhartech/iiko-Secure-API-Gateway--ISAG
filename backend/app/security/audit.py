@@ -39,6 +39,14 @@ logger = get_logger(__name__)
 
 _REQUEST_ID_HEADER = "X-Request-ID"
 
+# Service endpoints that must not generate a DB audit row on every hit
+# (health/readiness probes and the metrics scrape run constantly).
+_SKIP_DB_AUDIT_PATHS: frozenset[str] = frozenset({"/health", "/ready", "/metrics"})
+
+# [B1] Hold strong references to in-flight background DB-write tasks so they
+# are not garbage-collected before completion (asyncio only keeps weak refs).
+_background_tasks: set[asyncio.Task] = set()
+
 
 class AuditLogMiddleware(BaseHTTPMiddleware):
     """
@@ -132,18 +140,28 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                 decision=decision,
             )
 
-            # Async log to DB for historical stats (fire and forget)
-            async def _log_to_db():
-                try:
-                    async with AsyncSessionLocal() as session:
-                        log_entry = GatewayRequestLog(
-                            client_id=user_id,
-                            status_code=status_code,
-                            latency_ms=latency_ms
-                        )
-                        session.add(log_entry)
-                        await session.commit()
-                except Exception as e:
-                    logger.error("db_audit_log_failed", error=str(e))
-            
-            asyncio.create_task(_log_to_db())
+            # Async log to DB for historical stats (background, non-blocking).
+            # [B1] Skip noisy service probes and keep a strong reference to the
+            # task so it survives until completion.
+            if request.url.path not in _SKIP_DB_AUDIT_PATHS:
+                async def _log_to_db(
+                    client_id: str = user_id,
+                    code: int = status_code,
+                    latency: float = latency_ms,
+                ) -> None:
+                    try:
+                        async with AsyncSessionLocal() as session:
+                            session.add(
+                                GatewayRequestLog(
+                                    client_id=client_id,
+                                    status_code=code,
+                                    latency_ms=latency,
+                                )
+                            )
+                            await session.commit()
+                    except Exception as e:
+                        logger.error("db_audit_log_failed", error=str(e))
+
+                task = asyncio.create_task(_log_to_db())
+                _background_tasks.add(task)
+                task.add_done_callback(_background_tasks.discard)

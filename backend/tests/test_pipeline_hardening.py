@@ -29,7 +29,7 @@ async def test_response_headers_filtering(async_client, make_token):
     response = await client.get("/health")
     
     assert response.status_code == 200
-    # "Server" header should be stripped by ResponseFilterMiddleware
+    # "Server" header should be stripped by SecureHeadersMiddleware
     assert "Server" not in response.headers
 
 @pytest.mark.asyncio

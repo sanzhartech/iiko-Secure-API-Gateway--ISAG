@@ -22,6 +22,8 @@ THREAT MODEL addressed:
 
 from __future__ import annotations
 
+import os
+
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
@@ -96,7 +98,14 @@ def _on_rate_limit_exceeded(request: Request, exc: RateLimitExceeded) -> JSONRes
 
 
 # Singleton limiter instance.
-# The default limit is set to 100/minute here as a safe fallback.
-# In main.py the limiter is re-created (via create_limiter) with the value
-# from settings.rate_limit_per_ip so the env-variable is honoured at runtime.
-limiter = create_limiter("memory://")
+#
+# [B2] Storage is configured ONCE at import time from the REDIS_URL environment
+# variable (the same source Settings reads). slowapi/limits builds the backing
+# storage and strategy lazily and correctly from this URI — so we never poke at
+# private attributes (._storage / ._strategy) from main.py anymore.
+#
+# Falls back to in-process memory:// when REDIS_URL is unset (local dev / tests).
+# In any multi-worker or multi-replica deployment REDIS_URL MUST be set so the
+# rate-limit counters are shared across workers.
+_STORAGE_URI = os.getenv("REDIS_URL", "memory://")
+limiter = create_limiter(_STORAGE_URI)

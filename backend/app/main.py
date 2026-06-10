@@ -20,7 +20,6 @@ from app.core.logging import configure_logging, get_logger
 from app.middleware.rate_limiter import _on_rate_limit_exceeded, create_limiter, limiter
 from app.middleware.secure_headers import SecureHeadersMiddleware
 from app.middleware.size_validator import RequestSizeValidatorMiddleware
-from app.middleware.response_filter import ResponseFilterMiddleware
 from app.security.audit import AuditLogMiddleware
 from app.middleware.metrics import MetricsMiddleware
 from app.core.redis import get_redis_service
@@ -197,9 +196,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     # ── Middleware Stack (LIFO — last registered runs first for requests) ────
-
-    # Stage 9: Response Filtering (Innermost)
-    app.add_middleware(ResponseFilterMiddleware)
+    # [C1] ResponseFilterMiddleware was removed: it only stripped the "Server"
+    # header, which SecureHeadersMiddleware (outermost) already does. Dropping
+    # the extra BaseHTTPMiddleware removes one anyio task wrap per request.
 
     # [Phase 5] Prometheus metrics instrumentation.
     # Must be inner to AuditLog so it measures app processing time only.
@@ -212,14 +211,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     # CORS Stage
-    # Add common development ports and explicit origins from settings
+    # [A3] In production use ONLY the explicit allow-list from settings.
+    # Common localhost dev ports are appended automatically in development only,
+    # so they can never silently widen a production origin allow-list.
     cors_origins = settings.cors_origins_list
-    if "http://localhost:3000" not in cors_origins:
-        cors_origins.append("http://localhost:3000")
-    if "http://localhost:3001" not in cors_origins:
-        cors_origins.append("http://localhost:3001")
-    if "http://localhost" not in cors_origins:
-        cors_origins.append("http://localhost")
+    if settings.app_env == "development":
+        for dev_origin in (
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost",
+        ):
+            if dev_origin not in cors_origins:
+                cors_origins.append(dev_origin)
 
     app.add_middleware(
         CORSMiddleware,
@@ -240,15 +243,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # [Sec-2] Re-enabled: injects HSTS, X-Frame-Options, CSP, etc. on every response.
     app.add_middleware(SecureHeadersMiddleware)
 
-    # [Fix #5] Use the global limiter singleton but ensure it uses the
-    # default limit and Redis storage from settings.
+    # [B2] The limiter singleton already has its storage configured from the
+    # REDIS_URL environment variable at import time (see rate_limiter.py).
+    # Here we only set the default per-IP limit from settings — a public
+    # attribute, no private slowapi internals are touched.
     limiter.default_limits = [settings.rate_limit_per_ip]
-    # Re-initialize storage if Redis is configured
-    if settings.redis_url:
-        from limits.storage import storage_from_string
-        limiter._storage = storage_from_string(settings.redis_url)
-        limiter._strategy = None # Force re-creation of strategy with new storage
-    
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _on_rate_limit_exceeded)
 

@@ -261,10 +261,12 @@ class TestJWTKeyRotation:
             f"Wrong key for valid kid must return 401, got {response.status_code}"
         )
 
-    async def test_jti_replay_protection(self, async_client, make_token):
+    async def test_access_token_is_reusable(self, async_client, make_token):
         """
-        [Phase 3] Test that the same token cannot be used twice (Replay Protection).
-        Stage 5 of the Security Pipeline.
+        [A1] Access tokens are standard reusable bearer credentials valid until
+        `exp`. Replay protection must NOT apply to them — a client reuses the
+        same access token across many calls. Reusing one must keep returning 200
+        (and must not perform a JTI Redis round-trip on the hot path).
         """
         client, mock_iiko, mock_redis = async_client
         mock_redis.get.return_value = None
@@ -278,58 +280,40 @@ class TestJWTKeyRotation:
             yield _httpx.Response(200, json={"ok": True})
         mock_iiko.proxy_request_stream = _mock_cm
 
-        # First attempt: mock_redis.set returns None (NX=True successful, new token)
-        mock_redis.set.side_effect = [None]
-
-        response1 = await client.get(
-            "/api/orders",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert response1.status_code == 200
-
-        # Second attempt: mock_redis.set returns a timestamp (REPLAY)
-        # We use a timestamp from 10 seconds ago to be outside the 2s grace period.
+        # Simulate that the JTI store would treat this as a replay (old timestamp),
+        # to prove the access path never consults it.
         import time
-        past_timestamp = str(int(time.time()) - 10)
-        mock_redis.set.side_effect = [past_timestamp]
+        mock_redis.set.side_effect = lambda *a, **k: str(int(time.time()) - 999)
 
-        response2 = await client.get(
-            "/api/orders",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert response2.status_code == 401
-        assert response2.json()["detail"] == "Unauthorized"
+        for _ in range(3):
+            response = await client.get(
+                "/api/orders",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert response.status_code == 200
 
-    async def test_jti_grace_period_allowed(self, async_client, make_token):
+        # The JTI store (Redis SET NX) must never have been hit for access tokens.
+        mock_redis.set.assert_not_called()
+
+    async def test_refresh_token_replay_rejected(self, async_client, make_token):
         """
-        Test that parallel requests within the 2s grace period are ALLOWED.
-        This supports React frontend's simultaneous fetching.
+        [A1] Replay protection still applies to REFRESH tokens (one-time use with
+        rotation). A refresh token already seen in the JTI store is rejected with
+        401 before any client lookup.
         """
-        client, mock_iiko, mock_redis = async_client
-        mock_redis.get.return_value = None
-        token = make_token()
+        client, _mock_iiko, mock_redis = async_client
+        refresh = make_token(token_type="refresh")
 
-        from contextlib import asynccontextmanager
-        @asynccontextmanager
-        async def _mock_cm(*args, **kwargs):
-            import httpx as _httpx
-            yield _httpx.Response(200, json={"ok": True})
-        mock_iiko.proxy_request_stream = _mock_cm
-
-        # First attempt: success
-        mock_redis.set.side_effect = [None]
-        await client.get("/api/orders", headers={"Authorization": f"Bearer {token}"})
-
-        # Second attempt: same token but WITHIN 1 second of the first use
+        # SET NX GET returns an old timestamp → key already exists, outside grace
+        # → is_replay() returns True → validator rejects with 401.
         import time
-        current_timestamp = str(int(time.time()))
-        mock_redis.set.side_effect = [current_timestamp] # simulate key already exists with recent TS
-        mock_redis.incr.return_value = 1 # Allow one grace use
+        mock_redis.set.side_effect = lambda *a, **k: str(int(time.time()) - 10)
 
-        response2 = await client.get(
-            "/api/orders",
-            headers={"Authorization": f"Bearer {token}"},
+        response = await client.post(
+            "/auth/refresh",
+            json={"refresh_token": refresh},
         )
-        # Should still be 200 due to grace period
-        assert response2.status_code == 200
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Unauthorized"
 

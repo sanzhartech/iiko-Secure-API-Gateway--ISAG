@@ -23,6 +23,7 @@ from app.core.hashing import get_password_hash
 from app.core.network import get_client_ip  # [Sec-3] Centralized safe IP extraction
 from app.core.config import Settings, get_settings
 from app.core.redis import get_redis
+from app.core.kill_switch import is_globally_blocked, set_global_block
 import redis.asyncio as redis
 from app.schemas.token import TokenClaims
 from app.security.jwt_validator import get_current_claims
@@ -227,8 +228,7 @@ async def get_kill_switch_status(
     redis_client: Annotated[redis.Redis, Depends(get_redis)]
 ) -> KillSwitchResponse:
     """Get the current status of the global kill switch."""
-    val = await redis_client.get("isag:global_block")
-    return KillSwitchResponse(active=(val == "1"))
+    return KillSwitchResponse(active=await is_globally_blocked(redis_client))
 
 @router.post("/kill-switch", response_model=KillSwitchResponse)
 async def set_kill_switch_status(
@@ -240,10 +240,9 @@ async def set_kill_switch_status(
     redis_client: Annotated[redis.Redis, Depends(get_redis)]
 ) -> KillSwitchResponse:
     """Activate or deactivate the global kill switch."""
-    if body.active:
-        await redis_client.set("isag:global_block", "1")
-    else:
-        await redis_client.delete("isag:global_block")
+    # [B3] Writes Redis AND invalidates the in-process cache so the change
+    # takes effect immediately on this worker.
+    await set_global_block(redis_client, body.active)
 
     client_ip = get_client_ip(request, trusted_cidrs=settings.trusted_proxy_cidrs_list)
     audit_log = AdminAuditLog(

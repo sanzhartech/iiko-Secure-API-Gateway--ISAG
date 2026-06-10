@@ -44,14 +44,22 @@ def _normalise_endpoint(request: Request) -> str:
     """
     Return a stable endpoint label for Prometheus metrics.
 
-    Uses FastAPI's own route matching to replace dynamic path segments
-    (e.g. /api/orders/42 → /api/{path}) so cardinality stays bounded.
-    Falls back to the raw path if no route is matched (e.g. 404s).
+    [C3] After routing, Starlette stores the matched route in
+    ``request.scope["route"]``. Reading its ``path`` template
+    (e.g. /api/orders/42 → /api/{path}) keeps metric cardinality bounded
+    in O(1), avoiding a per-request scan over every registered route.
+
+    Falls back to scanning routes (then the raw path) only when no route was
+    matched — e.g. 404s, or when called before routing completed.
     """
-    for route in request.app.routes:
-        match, _ = route.matches(request.scope)
+    route = request.scope.get("route")
+    if route is not None:
+        return getattr(route, "path", request.url.path)
+
+    for candidate in request.app.routes:
+        match, _ = candidate.matches(request.scope)
         if match == Match.FULL:
-            return getattr(route, "path", request.url.path)
+            return getattr(candidate, "path", request.url.path)
     return request.url.path
 
 

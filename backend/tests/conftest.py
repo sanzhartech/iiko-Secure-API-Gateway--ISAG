@@ -303,3 +303,10 @@ def reset_mocks(async_client):
     mock_redis.set.side_effect = lambda *args, **kwargs: None
     mock_redis.incr.return_value = 1
     mock_redis.expire.return_value = True
+    # Default: kill-switch OFF. Prevents a prior test that set get="1" from
+    # leaking into the next test (order-independent isolation).
+    mock_redis.get.return_value = None
+    # Reset the in-process kill-switch cache so it re-reads the mock each test.
+    from app.core import kill_switch
+    kill_switch._cache["value"] = False
+    kill_switch._cache["checked_at"] = 0.0
